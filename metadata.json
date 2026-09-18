@@ -1,0 +1,6 @@
+{
+  "name": "SwasthAI",
+  "description": "Your Smart Health Checkup Assistant - Routine health monitoring, camera PPG, heart sound, respiratory, and gait screening.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

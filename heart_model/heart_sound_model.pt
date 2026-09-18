@@ -1,0 +1,22 @@
+{
+  "model_version": "heart_sound_cnn_v1",
+  "architecture": "HeartSoundCNN",
+  "input_shape": [1, 64, 128],
+  "classes": ["normal", "abnormal_pattern"],
+  "dataset": "PhysioNet/CinC 2016 Challenge PCG",
+  "created_at": "2026-09-06T00:00:00Z",
+  "hyperparameters": {
+    "sample_rate": 2000,
+    "n_mels": 64,
+    "n_fft": 256,
+    "hop_length": 64,
+    "fixed_frames": 128
+  },
+  "weights": {
+    "conv1_kernels": 32,
+    "conv2_kernels": 64,
+    "conv3_kernels": 128,
+    "fc1_units": 128,
+    "fc2_units": 2
+  }
+}

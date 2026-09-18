@@ -1,0 +1,26 @@
+{
+  "admin@swasthai.com": {
+    "id": "usr_admin_2507ad14",
+    "name": "Dr. Medical Administrator",
+    "email": "admin@swasthai.com",
+    "passwordHash": "Admin@Swasth2026!",
+    "passwordSha256": "f5580423f3350b0bd0c1f94b903aca7f87041f00c7b724bda1b6b1bfd41d37ac",
+    "role": "ADMIN",
+    "permissions": [
+      "user.profile.read",
+      "user.profile.write",
+      "user.checkups.run",
+      "user.reports.read",
+      "admin.portal.access",
+      "admin.patients.list",
+      "admin.patients.view_summary",
+      "admin.patients.inspect_full",
+      "admin.reports.download",
+      "admin.audit.read",
+      "admin.simulation.execute",
+      "admin.system.reset"
+    ],
+    "seededAt": "2026-09-07T15:16:31.757713Z",
+    "updatedAt": "2026-09-10T08:14:50.373913Z"
+  }
+}
