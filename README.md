@@ -102,8 +102,8 @@ flowchart TD
 | **Frontend** | React 19, TypeScript 5.8, Vite 6, Tailwind CSS v4, Lucide Icons, Framer Motion, Recharts, jsPDF |
 | **Backend** | Node.js 18+, Express 4, esbuild, tsx |
 | **AI / ML & Signal Processing** | PyTorch (Model Training), In-Process TypeScript `HeartSoundCNN` Inference, Cooley-Tukey FFT, Mel-Filterbank, MediaPipe Pose Kinematics |
-| **Database / Storage** | In-Memory Data Store with JSON persistence abstraction, LocalStorage token management |
-| **Security & Auth** | JWT Authentication, SHA-256 password hashing, RBAC Middleware, CORS |
+| **Database / Storage** | Server-side JSON Database Engine (`data/users.json`, `data/profiles.json`, `data/sessions.json`, `data/checkups.json`, `data/measurements.json`, `data/reports.json`) |
+| **Security & Auth** | Salted PBKDF2 (100,000 iterations) password hashing, HTTP-only `swasthai_session` cookies, Bearer token fallback, Session Expiration, Strict User-Data Isolation, RBAC Middleware |
 | **Build & Testing** | Vite, esbuild, TypeScript Compiler (`tsc`), Custom End-to-End & Signal Processing Test Suites |
 | **Deployment** | Render, Railway, Vercel, Docker (Single-binary Express CJS output) |
 
@@ -218,6 +218,29 @@ swasthai/
 | `ADMIN_EMAIL` | `admin@swasthai.com` | Default admin seed email |
 
 See [.env.example](.env.example) for the complete list of configurable variables.
+
+---
+
+## Authentication & Server JSON Storage System
+
+SwasthAI features an end-to-end server-side authentication engine and JSON data storage layer:
+
+### Architecture & Key Features
+- **Gatekeeping Authentication**: Unauthenticated users are presented with the **Login / Register** screen on entry and cannot view protected application views (`/dashboard`, `/checkup`, `/trends`, `/reports`, `/profile`).
+- **Server-Side Data Layer (`data/*.json`)**:
+  - `data/users.json`: Authenticated user accounts with salted PBKDF2 password hashes (100,000 iterations).
+  - `data/profiles.json`: Demographic health profiles (`age`, `sex`, `height`, `weight`, `existingConditions`, `medications`).
+  - `data/sessions.json`: Active server-side sessions with 7-day expiration.
+  - `data/checkups.json`: Active and historical checkup sessions (`startedAt`, `completedAt`, `modules`).
+  - `data/measurements.json`: Individual sensor telemetry (`ppg`, `heart_sound`, `cough`, `gait`, `bmi`).
+  - `data/reports.json`: Generated health assessment summaries.
+- **Session Handling & Cookies**: Uses HTTP-only `swasthai_session` cookies with fallback `Authorization: Bearer <token>` support.
+- **Strict User-Data Isolation**: All database queries are scoped to `req.user.id`. User A cannot access User B's profile, health telemetry, checkup sessions, or reports.
+- **Account Duplicate Prevention**: Attempts to register existing emails return error code `ACCOUNT_EXISTS` with UI prompts to log in instead.
+
+> [!IMPORTANT]
+> **Deployment Limitation Notice**:
+> JSON filesystem storage inside `data/*.json` is designed for local development, hackathon demos, and self-hosted environments. On ephemeral cloud platforms (such as Render free web services), file system modifications may reset when the server restarts or redeploys. For production enterprise deployments, replace `JSONStore` (`server/json_store.ts`) with a durable relational database driver (such as PostgreSQL or Prisma).
 
 ---
 

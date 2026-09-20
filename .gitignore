@@ -59,4 +59,8 @@ scratch/
 tmp/
 temp/
 
+# JSON Database Files (Sensitive runtime user data)
+data/*.json
+!data/.gitkeep
+
 # Lock files (Optional - preserve bun.lock / package-lock.json in root if tracked)

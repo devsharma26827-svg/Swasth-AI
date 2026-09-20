@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "clean": "node -e \"fs.rmSync('dist', {recursive: true, force: true})\"",
     "lint": "tsc --noEmit",
-    "test": "tsx server/e2e_verification_test.ts && tsx server/heart_sound_test.ts && tsx server/ppg_test.ts",
+    "test": "tsx server/auth_test.ts && tsx server/e2e_verification_test.ts && tsx server/heart_sound_test.ts && tsx server/ppg_test.ts",
+    "test:auth": "tsx server/auth_test.ts",
     "test:e2e": "tsx server/e2e_verification_test.ts",
     "test:heart": "tsx server/heart_sound_test.ts",
     "test:ppg": "tsx server/ppg_test.ts"

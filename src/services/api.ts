@@ -45,6 +45,7 @@ export function getAuthToken(): string {
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const token = getAuthToken();
   const res = await fetch(`${BASE_URL}${url}`, {
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -56,7 +57,11 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.success === false) {
     const message = data?.error?.message || data?.message || `Request failed with status ${res.status}`;
-    throw new Error(message);
+    const code = data?.code || data?.error?.code || 'UNKNOWN_ERROR';
+    const err: any = new Error(message);
+    err.code = code;
+    err.data = data;
+    throw err;
   }
   return data as T;
 }
@@ -98,7 +103,7 @@ export const authApi = {
       setAuthToken(null);
     }
   },
-  me: async () => fetchJson<{ success: boolean; user: UserProfile }>('/api/auth/me')
+  me: async () => fetchJson<{ success: boolean; user: UserProfile; profile: UserProfile }>('/api/auth/me')
 };
 
 export const profileApi = {

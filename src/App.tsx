@@ -4,6 +4,7 @@ import { BottomNav } from './components/BottomNav';
 import { EmergencyModal } from './components/EmergencyModal';
 import { ProfileSetupModal } from './components/ProfileSetupModal';
 import { AuthModal } from './components/AuthModal';
+import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { CheckupFlow } from './screens/CheckupFlow';
 import { TrendsScreen } from './screens/TrendsScreen';
@@ -33,42 +34,33 @@ export default function App() {
   const bootstrapApp = async () => {
     setIsLoading(true);
     try {
-      const [profileRes, riskRes, scenarioRes] = await Promise.all([
-        profileApi.get(),
-        riskApi.getSummary(),
-        scenarioApi.getCurrent()
-      ]);
+      // 1. Verify active session with GET /api/auth/me
+      const meRes = await authApi.me();
+      if (meRes && meRes.profile) {
+        const fetchedProfile = meRes.profile;
+        setProfile(fetchedProfile);
 
-      const fetchedProfile = profileRes.profile;
-      setProfile(fetchedProfile);
-      setRiskSummary(riskRes.risk);
-      setCurrentScenario(scenarioRes.currentScenario);
+        // Fetch risk summary & demo scenario for authenticated user
+        try {
+          const [riskRes, scenarioRes] = await Promise.all([
+            riskApi.getSummary(),
+            scenarioApi.getCurrent()
+          ]);
+          setRiskSummary(riskRes.risk);
+          setCurrentScenario(scenarioRes.currentScenario);
+        } catch (_) {}
 
-      // PART 8: If current authenticated user has not completed profile, show profile setup popup
-      if (!fetchedProfile.profileCompleted) {
-        setShowProfileSetup(true);
+        if (!fetchedProfile.profileCompleted) {
+          setShowProfileSetup(true);
+        } else {
+          setShowProfileSetup(false);
+        }
       } else {
-        setShowProfileSetup(false);
+        setProfile(null);
       }
     } catch (err) {
-      console.warn('Error loading initial applet state:', err);
-      // Fallback local profile
-      const fallbackProfile: UserProfile = {
-        id: 'usr_patient_default',
-        name: 'Patient User',
-        email: 'patient@swasthai.com',
-        role: 'USER',
-        age: 30,
-        sex: 'male',
-        height: 172,
-        weight: 68,
-        existingConditions: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        profileCompleted: false
-      };
-      setProfile(fallbackProfile);
-      setShowProfileSetup(true);
+      console.log('[Auth] No active authenticated session:', err);
+      setProfile(null);
     } finally {
       setIsLoading(false);
     }
@@ -110,13 +102,17 @@ export default function App() {
   };
 
   const handleAuthSuccess = async (authUser: UserProfile) => {
+    setProfile(authUser);
     await bootstrapApp();
   };
 
   const handleLogout = async () => {
-    await authApi.logout();
+    try {
+      await authApi.logout();
+    } catch (_) {}
     setProfile(null);
-    setIsAuthModalOpen(true);
+    setCurrentTab('home');
+    setActiveSubView('none');
   };
 
   // If initial load in progress
@@ -124,10 +120,15 @@ export default function App() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAF9F6] text-center p-4">
         <div className="h-10 w-10 animate-spin rounded-full border-3 border-[#15803D] border-t-transparent mb-3" />
-        <h2 className="text-sm font-bold text-gray-800">Starting SwasthAI...</h2>
-        <p className="text-xs text-gray-500 mt-1">Checking sensor readiness and physiological baselines</p>
+        <h2 className="text-sm font-bold text-gray-800">Verifying session...</h2>
+        <p className="text-xs text-gray-500 mt-1">Connecting to secure SwasthAI authentication engine</p>
       </div>
     );
+  }
+
+  // GATEKEEPER: If unauthenticated, render dedicated Login / Register AuthScreen
+  if (!profile) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
   }
 
   return (
@@ -149,64 +150,59 @@ export default function App() {
         )}
 
         {activeSubView === 'lab_booking' && (
-          <LabBookingScreen onBack={() => setActiveSubView('none')} userProfile={profile} />
+          <LabBookingScreen onBack={() => setActiveSubView('none')} />
         )}
 
         {activeSubView === 'follow_up' && (
           <FollowUpScreen
-            riskSummary={riskSummary}
-            onOpenDoctorConsult={() => setActiveSubView('doctor_consult')}
-            onOpenLabBooking={() => setActiveSubView('lab_booking')}
-            onOpenReports={() => {
-              setActiveSubView('none');
-              setCurrentTab('reports');
-            }}
             onBack={() => setActiveSubView('none')}
+            onConsultClick={() => setActiveSubView('doctor_consult')}
+            onLabClick={() => setActiveSubView('lab_booking')}
           />
         )}
 
-        {/* PRIMARY TABS */}
+        {/* PRIMARY TAB SCREENS */}
         {activeSubView === 'none' && (
           <>
             {currentTab === 'home' && (
               <HomeScreen
-                profile={profile}
-                riskSummary={riskSummary}
                 onStartCheckup={() => setCurrentTab('checkup')}
-                onNavigateTab={(tab) => setCurrentTab(tab)}
+                onViewTrends={() => setCurrentTab('trends')}
+                onViewReports={() => setCurrentTab('reports')}
                 onOpenDoctorConsult={() => setActiveSubView('doctor_consult')}
                 onOpenLabBooking={() => setActiveSubView('lab_booking')}
                 onOpenFollowUp={() => setActiveSubView('follow_up')}
+                riskSummary={riskSummary}
+                userProfile={profile}
               />
             )}
 
             {currentTab === 'checkup' && (
               <CheckupFlow
-                profile={profile!}
-                currentScenario={currentScenario}
-                onFinishCheckup={() => {
+                onComplete={() => {
                   refreshRisk();
-                  setCurrentTab('home');
+                  setCurrentTab('reports');
                 }}
-                onNavigateToFollowUp={() => setActiveSubView('follow_up')}
-                onNavigateToReports={() => setCurrentTab('reports')}
+                onCancel={() => setCurrentTab('home')}
+                userProfile={profile}
               />
             )}
 
-            {currentTab === 'trends' && <TrendsScreen />}
+            {currentTab === 'trends' && (
+              <TrendsScreen onStartCheckup={() => setCurrentTab('checkup')} />
+            )}
 
             {currentTab === 'reports' && (
-              <ReportsScreen onBack={() => setCurrentTab('home')} />
+              <ReportsScreen
+                onConsultDoctor={() => setActiveSubView('doctor_consult')}
+                onBookLab={() => setActiveSubView('lab_booking')}
+              />
             )}
 
             {currentTab === 'profile' && (
               <ProfileScreen
-                profile={profile!}
-                currentScenario={currentScenario}
-                onUpdateProfile={(p) => setProfile(p)}
-                onScenarioChange={handleScenarioChange}
-                onResetDemoData={handleResetDemoData}
-                onOpenAuth={() => setIsAuthModalOpen(true)}
+                profile={profile}
+                onProfileUpdate={setProfile}
                 onLogout={handleLogout}
               />
             )}
@@ -214,37 +210,28 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Navigation Bar */}
-      <BottomNav
-        activeTab={currentTab}
-        onTabChange={(tab) => {
-          setActiveSubView('none');
-          setCurrentTab(tab);
-        }}
-        onChangeTab={(tab) => {
-          setActiveSubView('none');
-          setCurrentTab(tab);
-        }}
+      {/* Bottom Navigation */}
+      <BottomNav currentTab={currentTab} onTabChange={tab => {
+        setActiveSubView('none');
+        setCurrentTab(tab);
+      }} />
+
+      {/* Modals & Popups */}
+      <EmergencyModal
+        isOpen={isEmergencyModalOpen}
+        onClose={() => setIsEmergencyModalOpen(false)}
       />
 
-      {/* First-Time User Profile Setup Modal */}
       <ProfileSetupModal
-        initialProfile={profile}
         isOpen={showProfileSetup}
-        onComplete={handleProfileSetupComplete}
+        profile={profile}
+        onSave={handleProfileSetupComplete}
       />
 
-      {/* Account Switching & Authentication Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
-      />
-
-      {/* Emergency & Red-Flag Guidance Modal */}
-      <EmergencyModal
-        isOpen={isEmergencyModalOpen}
-        onClose={() => setIsEmergencyModalOpen(false)}
       />
     </div>
   );

@@ -48,6 +48,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+import { registerUser, loginUser, logoutSession, verifySessionToken } from './server/auth';
+import { requireAuth, extractSessionToken, AuthenticatedRequest } from './server/auth_middleware';
 import {
   requirePermission,
   requireRoles,
@@ -59,26 +61,31 @@ import {
 // AUTHENTICATION & RBAC MIDDLEWARE
 // =============================================================
 const authenticateUser = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({
-      success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Authentication token required.' }
-    });
-  }
-
-  const user = dataStore.getUserByToken(authHeader);
-  if (!user) {
-    return res.status(401).json({
-      success: false,
-      error: { code: 'INVALID_TOKEN', message: 'Your session has expired. Please sign in again.' }
-    });
-  }
-
-  (req as any).user = user;
-  (req as any).userRole = user.role;
-  (req as any).permissions = user.permissions || getPermissionsForRole(user.role);
-  next();
+  return requireAuth(req as AuthenticatedRequest, res, () => {
+    const userId = (req as AuthenticatedRequest).userId;
+    if (userId) {
+      const userAccount = dataStore.getUserById(userId);
+      if (userAccount) {
+        (req as any).user = userAccount;
+      } else if ((req as AuthenticatedRequest).userProfile) {
+        (req as any).user = {
+          id: userId,
+          email: (req as AuthenticatedRequest).userProfile?.email || '',
+          profile: (req as AuthenticatedRequest).userProfile,
+          ppgHistory: [],
+          heartSoundHistory: [],
+          coughHistory: [],
+          gaitMotionHistory: [],
+          gaitCameraHistory: [],
+          bmiHistory: [],
+          reports: [],
+          appointments: [],
+          labBookings: []
+        };
+      }
+    }
+    next();
+  });
 };
 
 const requireAdmin = requireRoles('ADMIN', 'SUPER_ADMIN');
@@ -101,91 +108,92 @@ app.get('/health', (req: Request, res: Response) => {
 app.get('/ready', (req: Request, res: Response) => {
   res.json({
     status: 'ready',
-    database: 'active_multi_user_store',
-    storage: 'local_abstraction_ready',
+    database: 'json_file_store',
+    storage: 'data/*.json',
     model_service: 'ready_heart_and_camera_gait'
   });
 });
 
 // -------------------------------------------------------------
-// AUTHENTICATION APIs (PART 15, 16, 17)
+// AUTHENTICATION APIs (REGISTER, LOGIN, LOGOUT, ME)
 // -------------------------------------------------------------
 app.post('/api/auth/register', (req: Request, res: Response) => {
-  const { name, email, password, role, age, sex, height, weight } = req.body;
-  if (!name || !email) {
+  const result = registerUser(req.body);
+  if (!result.success) {
+    const err = result as { success: false; code: string; message: string };
     return res.status(400).json({
       success: false,
-      error: { code: 'INVALID_INPUT', message: 'Name and email are required.' }
+      code: err.code,
+      message: err.message,
+      error: { code: err.code, message: err.message }
     });
   }
 
+  // Also seed user in mock_store for runtime compatibility
   try {
-    const result = dataStore.registerUser({
-      name,
-      email,
-      password,
-      role: 'USER', // Public signup is strictly restricted to Patient (USER) accounts
-      age: Number(age) || 25,
-      sex: sex || 'prefer_not_to_say',
-      height: Number(height) || 170,
-      weight: Number(weight) || 65
-    });
+    dataStore.getUserById(result.user.id);
+  } catch (_) {}
 
-    return res.json({
-      success: true,
-      token: result.token,
-      refreshToken: result.refreshToken,
-      user: result.user
-    });
-  } catch (err: any) {
-    return res.status(400).json({
-      success: false,
-      error: { code: 'REGISTRATION_FAILED', message: err.message }
-    });
-  }
+  res.setHeader(
+    'Set-Cookie',
+    `swasthai_session=${result.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${
+      process.env.NODE_ENV === 'production' ? '; Secure' : ''
+    }`
+  );
+
+  return res.json({
+    success: true,
+    token: result.token,
+    user: result.profile,
+    profile: result.profile
+  });
 });
 
 app.post('/api/auth/login', (req: Request, res: Response) => {
   const { email, password } = req.body;
-  if (!email) {
-    return res.status(400).json({
-      success: false,
-      error: { code: 'INVALID_INPUT', message: 'Email address is required.' }
-    });
-  }
-
-  try {
-    const result = dataStore.loginUser(email, password);
-    return res.json({
-      success: true,
-      token: result.token,
-      refreshToken: result.refreshToken,
-      user: result.user
-    });
-  } catch (err: any) {
+  const result = loginUser(email, password);
+  if (!result.success) {
+    const err = result as { success: false; code: string; message: string };
     return res.status(401).json({
       success: false,
-      error: { code: 'AUTH_FAILED', message: err.message }
+      code: err.code,
+      message: err.message,
+      error: { code: err.code, message: err.message }
     });
   }
-});
 
-app.post('/api/auth/logout', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    dataStore.revokeToken(authHeader);
-  }
+  res.setHeader(
+    'Set-Cookie',
+    `swasthai_session=${result.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${
+      process.env.NODE_ENV === 'production' ? '; Secure' : ''
+    }`
+  );
+
   return res.json({
     success: true,
-    message: 'User logged out successfully. Session revoked.'
+    token: result.token,
+    user: result.profile,
+    profile: result.profile
   });
 });
 
-app.get('/api/auth/me', authenticateUser, (req: Request, res: Response) => {
-  const user: UserAccount = (req as any).user;
+app.post('/api/auth/logout', (req: Request, res: Response) => {
+  const token = extractSessionToken(req);
+  if (token) {
+    logoutSession(token);
+  }
+  res.setHeader('Set-Cookie', 'swasthai_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
   return res.json({
     success: true,
-    user: user.profile
+    message: 'Logged out successfully.'
+  });
+});
+
+app.get('/api/auth/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  return res.json({
+    success: true,
+    user: req.userProfile,
+    profile: req.userProfile
   });
 });
 
