@@ -178,12 +178,20 @@ export default function App() {
 
             {currentTab === 'checkup' && (
               <CheckupFlow
+                profile={profile}
+                userProfile={profile}
+                currentScenario={currentScenario}
+                onFinishCheckup={() => {
+                  refreshRisk();
+                  setCurrentTab('reports');
+                }}
                 onComplete={() => {
                   refreshRisk();
                   setCurrentTab('reports');
                 }}
                 onCancel={() => setCurrentTab('home')}
-                userProfile={profile}
+                onNavigateToFollowUp={() => setActiveSubView('follow_up')}
+                onNavigateToReports={() => setCurrentTab('reports')}
               />
             )}
 

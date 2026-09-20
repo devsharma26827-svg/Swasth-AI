@@ -170,10 +170,21 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
     stopCameraStream();
   };
 
+  const isCameraGaitResultValid = (obj: any): obj is CameraGaitResult => {
+    return (
+      obj &&
+      typeof obj === 'object' &&
+      typeof obj.status === 'string' &&
+      typeof obj.cadenceStepsPerMin === 'number' &&
+      typeof obj.stepSymmetryIndex === 'number'
+    );
+  };
+
   // =========================================================================
   // CAMERA GAIT: "Walk Toward Camera" Workflow
   // =========================================================================
   const startCameraGaitTest = async () => {
+    console.log('[GAIT:START]', { modality: gaitModality, activeMode, scenario: currentScenario });
     if (isTestingRef.current) return;
 
     // Reset state & guards
@@ -195,6 +206,7 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
 
     // DEMO branch
     if (activeMode === 'demo') {
+      console.log('[GAIT:SUBMIT]', { mode: 'demo', validFrameCount: 0 });
       setProcessingState('processing');
       try {
         const res = await measurementApi.submitCameraGait({
@@ -206,13 +218,27 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
         if (!isMountedRef.current) return;
         isTestingRef.current = false;
         const result = res?.result || res?.gaitCamera;
-        if (!result) {
+        console.log('[GAIT:API_RESPONSE]', {
+          hasResponse: !!res,
+          keys: res ? Object.keys(res) : [],
+          hasResult: !!result
+        });
+        if (!result || !isCameraGaitResultValid(result)) {
+          console.log('[GAIT:ERROR]', { reason: 'invalid_demo_result', result });
           throw new Error('Invalid response from demo camera gait service.');
         }
+        console.log('[GAIT:RESULT]', {
+          status: result.status,
+          modelVersion: result.modelVersion,
+          signalQuality: result.signalQuality,
+          cadence: result.cadenceStepsPerMin
+        });
         setCameraResult(result);
         setProcessingState('success');
+        console.log('[GAIT:ON_COMPLETE]', { hasOnComplete: !!onComplete, status: result.status });
         if (onComplete) onComplete(result);
       } catch (err: any) {
+        console.log('[GAIT:ERROR]', { error: err.message });
         if (!isMountedRef.current) return;
         isTestingRef.current = false;
         setProcessingState('error');
@@ -224,13 +250,16 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
     // REAL CAMERA BRANCH
     // Ensure stream is running
     if (!streamRef.current || !streamRef.current.active) {
+      console.log('[GAIT:CAMERA]', { initializing: true });
       await initCameraPreview();
     }
+    console.log('[GAIT:CAMERA]', { activeStream: !!streamRef.current });
 
     // Step 1: Countdown (5s) for user to position 3-4 meters away
     setProcessingState('countdown');
     let count = 5;
     setCountdownSeconds(count);
+    console.log('[GAIT:COUNTDOWN]', { countdownSeconds: count });
 
     timerRef.current = setInterval(() => {
       if (!isMountedRef.current || !isTestingRef.current) {
@@ -239,6 +268,7 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
       }
       count--;
       setCountdownSeconds(count);
+      console.log('[GAIT:COUNTDOWN]', { countdownSeconds: count });
       if (count <= 0) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -254,6 +284,7 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
     let duration = 6;
     setCameraSecondsLeft(duration);
     const startTime = Date.now();
+    console.log('[GAIT:RECORDING]', { durationSeconds: duration });
 
     // Start Landmark Extraction Loop safely inside try/catch
     const runFrameExtraction = () => {
@@ -387,14 +418,18 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
     // Validate frames before API call
     const frames = frameLandmarksRef.current || [];
     const validFrames = frames.filter(f => f && f.landmarks && typeof f.landmarks === 'object');
+    console.log('[GAIT:FRAMES]', { totalFrames: frames.length, validFrames: validFrames.length });
 
     if (validFrames.length < 5) {
+      console.log('[GAIT:ERROR]', { reason: 'insufficient_frames', validFrames: validFrames.length });
       setProcessingState('error');
       setErrorMessage("We couldn't reliably capture the walking sequence. Please retry with your full body visible and good lighting.");
       return;
     }
 
+    console.log('[GAIT:SUBMIT]', { mode: activeMode, validFrameCount: validFrames.length });
     setProcessingState('processing');
+
     try {
       const response = await measurementApi.submitCameraGait({
         mode: activeMode,
@@ -407,14 +442,35 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
       if (!isMountedRef.current) return;
 
       const result = response?.result || response?.gaitCamera;
-      if (!result) {
-        throw new Error("Invalid response format from camera gait service.");
+      console.log('[GAIT:API_RESPONSE]', {
+        hasResponse: !!response,
+        keys: response ? Object.keys(response) : [],
+        hasResult: !!result
+      });
+
+      if (!result || !isCameraGaitResultValid(result)) {
+        console.log('[GAIT:ERROR]', { reason: 'invalid_camera_result', result });
+        setProcessingState('error');
+        setErrorMessage("Unable to process the walking recording. Please retry.");
+        return;
       }
+
+      console.log('[GAIT:RESULT]', {
+        status: result.status,
+        modelVersion: result.modelVersion,
+        signalQuality: result.signalQuality,
+        cadence: result.cadenceStepsPerMin
+      });
 
       setCameraResult(result);
       setProcessingState('success');
-      if (onComplete) onComplete(result);
+      console.log('[GAIT:ON_COMPLETE]', { hasOnComplete: !!onComplete, status: result.status });
+
+      if (onComplete) {
+        onComplete(result);
+      }
     } catch (err: any) {
+      console.log('[GAIT:ERROR]', { error: err.message });
       if (!isMountedRef.current) return;
       setProcessingState('error');
       setErrorMessage(err.message || "Kinematic camera gait extraction failed. Please retry.");

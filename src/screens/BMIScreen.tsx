@@ -4,14 +4,15 @@ import { measurementApi } from '../services/api';
 import { BMIResult, UserProfile } from '../types';
 
 interface Props {
-  profile: UserProfile;
+  profile?: UserProfile;
   onComplete?: (result: BMIResult) => void;
   onBack?: () => void;
 }
 
 export const BMIScreen: React.FC<Props> = ({ profile, onComplete, onBack }) => {
-  const [heightCm, setHeightCm] = useState(profile.height || 176);
-  const [weightKg, setWeightKg] = useState(profile.weight || 71.5);
+  const safeProfile = profile || { height: 170, weight: 70 };
+  const [heightCm, setHeightCm] = useState(safeProfile.height || 170);
+  const [weightKg, setWeightKg] = useState(safeProfile.weight || 70);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<BMIResult | null>(null);
 

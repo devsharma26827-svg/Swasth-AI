@@ -32,22 +32,49 @@ import {
 } from '../types';
 
 interface Props {
-  profile: UserProfile;
-  currentScenario: DemoScenario;
-  onFinishCheckup: () => void;
-  onNavigateToFollowUp: () => void;
-  onNavigateToReports: () => void;
+  profile?: UserProfile;
+  userProfile?: UserProfile;
+  currentScenario?: DemoScenario;
+  onFinishCheckup?: () => void;
+  onNavigateToFollowUp?: () => void;
+  onNavigateToReports?: () => void;
+  onComplete?: () => void;
+  onCancel?: () => void;
 }
 
 type CheckupStep = 'overview' | 'ppg' | 'heart_sound' | 'cough' | 'gait' | 'bmi' | 'summary';
 
 export const CheckupFlow: React.FC<Props> = ({
-  profile,
-  currentScenario,
+  profile: propProfile,
+  userProfile,
+  currentScenario = 'normal',
   onFinishCheckup,
   onNavigateToFollowUp,
-  onNavigateToReports
+  onNavigateToReports,
+  onComplete,
+  onCancel
 }) => {
+  const activeProfile: UserProfile = propProfile || userProfile || {
+    id: 'guest',
+    name: 'Patient User',
+    email: '',
+    role: 'USER',
+    age: 30,
+    sex: 'male',
+    height: 170,
+    weight: 70,
+    existingConditions: [],
+    medications: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    profileCompleted: true
+  };
+
+  const handleFinishAction = () => {
+    if (onFinishCheckup) onFinishCheckup();
+    else if (onComplete) onComplete();
+  };
+
   const [currentStep, setCurrentStep] = useState<CheckupStep>('overview');
   const [cadence, setCadence] = useState<'daily' | 'weekly' | 'comprehensive'>('daily');
   const [completedModules, setCompletedModules] = useState<{
@@ -88,8 +115,22 @@ export const CheckupFlow: React.FC<Props> = ({
   };
 
   const handleGaitComplete = (res: GaitResult | CameraGaitResult) => {
-    setCompletedModules(prev => ({ ...prev, gait: res }));
+    console.log('[CHECKUP:GaitComplete]', {
+      stepBefore: currentStep,
+      hasResult: !!res,
+      resultStatus: res?.status,
+      resultType: (res as any)?.source || 'unknown'
+    });
+    if (res) {
+      setCompletedModules(prev => ({ ...prev, gait: res }));
+    }
     setCurrentStep('bmi');
+    console.log('[CHECKUP:BMI]', {
+      stepAfter: 'bmi',
+      hasProfile: !!activeProfile,
+      profileHeight: activeProfile?.height,
+      profileWeight: activeProfile?.weight
+    });
   };
 
   const handleBMIComplete = (res: BMIResult) => {
@@ -258,7 +299,7 @@ export const CheckupFlow: React.FC<Props> = ({
       {/* 6. BMI SCREEN */}
       {currentStep === 'bmi' && (
         <BMIScreen
-          profile={profile}
+          profile={activeProfile}
           onBack={() => setCurrentStep('gait')}
           onComplete={handleBMIComplete}
         />
