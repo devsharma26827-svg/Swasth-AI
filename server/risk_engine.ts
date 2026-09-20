@@ -1,4 +1,4 @@
-import { HealthStatus, ConfidenceLevel, RiskSummary } from '../src/types';
+import { HealthStatus, ConfidenceLevel, RiskSummary, UserProfile } from '../src/types';
 
 export interface SignalReading {
   module: string;
@@ -17,11 +17,16 @@ export interface SignalReading {
 
 export class HealthRiskEngine {
   /**
-   * Evaluates collective multi-modal signals against baseline and history.
-   * Strictly avoids diagnostic labels and assigns risk state: NORMAL, MONITOR, or FOLLOW_UP.
+   * Evaluates collective multi-modal signals against baseline and user profile.
+   * Strictly evaluates ONLY completed modules in the current checkup session.
+   * Untested modules contribute NOTHING to risk score, confidence, or primary signals.
    */
-  static evaluateRisk(readings: SignalReading[]): RiskSummary {
-    // Filter out untested or null signals: ONLY tested modules are evaluated
+  static evaluateRisk(
+    readings: SignalReading[],
+    userProfile?: UserProfile | null,
+    userHistory?: { ppgCount?: number; heartSoundCount?: number; coughCount?: number; totalSessions?: number } | null
+  ): RiskSummary {
+    // Filter out untested, un-started, or invalid signals: ONLY completed modules in current session are evaluated
     const validReadings = (readings || []).filter(
       r => r && r.status && r.status !== 'not_tested' && r.status !== 'no_valid_results'
     );
@@ -32,11 +37,27 @@ export class HealthRiskEngine {
         riskScore: 0,
         confidence: 'low',
         primarySignals: [],
-        trendInsight: 'No screening tests were completed in this checkup session. No valid sensor data recorded.',
+        trendInsight: 'No valid screening measurements were completed in this checkup session.',
         recommendedAction: 'Perform at least one screening module (e.g. Camera PPG or Cough screening) to evaluate physiological signals.',
         followUpRequired: false,
         timestamp: new Date().toISOString()
       };
+    }
+
+    // Demographic Personalization Layer
+    let personalizedMaxHR = 190;
+    let targetRestingHRLow = 60;
+    let targetRestingHRHigh = 100;
+
+    if (userProfile && userProfile.age) {
+      personalizedMaxHR = Math.max(140, 220 - userProfile.age);
+      if (userProfile.activityLevel === 'very_active' || userProfile.activityLevel === 'moderately_active') {
+        targetRestingHRLow = 50;
+        targetRestingHRHigh = 85;
+      }
+      if (userProfile.smokingStatus === 'regular' || userProfile.smokingStatus === 'occasional') {
+        targetRestingHRHigh = Math.min(105, targetRestingHRHigh + 5);
+      }
     }
 
     let followUpCount = 0;
@@ -45,13 +66,12 @@ export class HealthRiskEngine {
     let totalQuality = 0;
 
     const primarySignals = validReadings.map(r => {
-      totalQuality += r.quality;
+      totalQuality += r.quality || 80;
       
-      // Weight module scores
+      // Module risk scoring
       let moduleScore = 15;
       if (r.status === 'follow_up') {
         moduleScore = 75;
-        // Check if this is an isolated occurrence vs repeated
         if ((r.historicalAbnormalCount || 0) >= 2) {
           moduleScore = 90;
           followUpCount += 2;
@@ -64,6 +84,17 @@ export class HealthRiskEngine {
       } else if (r.status === 'insufficient') {
         moduleScore = 20;
       }
+
+      // Demographic adjustment for PPG heart rate reading
+      if (r.module.includes('PPG') || r.module.includes('Heart Rate')) {
+        const hrVal = typeof r.value === 'number' ? r.value : parseFloat(String(r.value));
+        if (!isNaN(hrVal)) {
+          if (hrVal > personalizedMaxHR * 0.85 || hrVal > targetRestingHRHigh) {
+            moduleScore = Math.max(moduleScore, 60);
+          }
+        }
+      }
+
       totalScore += moduleScore;
 
       return {
@@ -79,19 +110,24 @@ export class HealthRiskEngine {
 
     let overallStatus: HealthStatus = 'normal';
     let followUpRequired = false;
-    let trendInsight = 'Your recent measurements align comfortably with your personal monitoring range.';
-    let recommendedAction = 'Maintain regular daily hydration, light activity, and weekly check-ins.';
 
-    // Any validated follow_up finding in a partial or full checkup requires clinical follow-up
+    // Determine baseline trend insight
+    const hasHistory = userHistory && (userHistory.totalSessions || 0) >= 3;
+    let trendInsight = hasHistory
+      ? `Your measurements align comfortably with your historical personal monitoring baseline across ${userHistory.totalSessions} sessions.`
+      : `Personal baseline not established yet. Assessment based on ${validReadings.length} completed screening module(s) in this session.`;
+
+    let recommendedAction = 'Maintain regular daily hydration, light activity, and routine check-ins.';
+
     if (followUpCount >= 2 || (followUpCount >= 1 && (validReadings.length === 1 || avgScore >= 50 || monitorCount >= 1))) {
       overallStatus = 'follow_up';
       followUpRequired = true;
-      trendInsight = 'An unusual pattern was detected during screening. Clinical review with a physician is recommended.';
+      trendInsight = 'An unusual physiological signal pattern was detected during screening. Clinical review with a physician is recommended.';
       recommendedAction = 'Consider scheduling a consultation with a healthcare professional to review this pattern.';
     } else if (followUpCount === 1 || monitorCount >= 1) {
       overallStatus = 'monitor';
       followUpRequired = false;
-      trendInsight = 'Your recent reading differs slightly from your usual range. Continue monitoring this trend.';
+      trendInsight = 'Your screening reading differs slightly from expected targets. Continue monitoring this trend.';
       recommendedAction = 'Re-check again tomorrow at the same time to establish whether this is a transient variance.';
     }
 

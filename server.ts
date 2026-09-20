@@ -333,53 +333,63 @@ app.post(['/api/measurements/ppg', '/measurements/ppg'], authenticateUser, (req:
   return res.json({ success: true, measurement: ppgResult });
 });
 
-// 2. Heart Sound Auscultation
+// 2. Heart Sound Auscultation (HeartSoundCNN Pipeline)
 app.post(['/api/screening/heart-sound', '/screening/heart-sound', '/screen/heart-sound'], authenticateUser, async (req: Request, res: Response) => {
   const user: UserAccount = (req as any).user;
-  const { audioSamples = [], sampleRate = 44100, simulatedScenario } = req.body;
+  const { mode = 'real', audioSamples = [], sampleRate = 2000, simulatedScenario } = req.body;
 
-  let samples: number[] = audioSamples;
-  if (!samples.length || samples.length < 100) {
+  const targetScenario = simulatedScenario || dataStore.getUserScenario(user.id);
+  let samples: number[] = Array.isArray(audioSamples) ? audioSamples : [];
+
+  if (mode === 'demo' || !samples.length || samples.length < 50) {
     samples = [];
-    const count = 1200;
-    const isAbnormal = simulatedScenario === 'follow_up';
+    const sr = sampleRate || 2000;
+    const count = sr * 5;
+    const isAbnormal = targetScenario === 'follow_up' || targetScenario === 'monitor';
     for (let i = 0; i < count; i++) {
-      const t = i / 1000;
-      const s1 = Math.exp(-Math.pow((t % 0.8) - 0.1, 2) / 0.002) * Math.sin(2 * Math.PI * 60 * t);
-      const s2 = Math.exp(-Math.pow((t % 0.8) - 0.4, 2) / 0.002) * Math.sin(2 * Math.PI * 90 * t);
+      const t = i / sr;
+      const s1 = Math.exp(-Math.pow((t % 0.85) - 0.05, 2) / 0.001) * Math.sin(2 * Math.PI * 55 * t);
+      const s2 = Math.exp(-Math.pow((t % 0.85) - 0.35, 2) / 0.0008) * Math.sin(2 * Math.PI * 85 * t);
       const murmur = isAbnormal ? 0.35 * Math.sin(2 * Math.PI * 220 * t) : 0;
       samples.push(s1 + s2 + murmur);
     }
   }
 
-  const analysis = HeartSoundAudioProcessor.analyzePhonocardiogram(samples, sampleRate);
-  let status: HealthStatus = 'normal';
-  if (analysis.patternType === 'murmur_suspected') {
-    status = 'follow_up';
-  } else if (analysis.patternType === 'arrhythmic' || analysis.s1S2Clarity < 50) {
-    status = 'monitor';
+  try {
+    const mlResult = await HeartSoundMLService.predict(samples, sampleRate || 2000, {
+      mode: mode === 'demo' ? 'demo' : 'real',
+      simulatedScenario: targetScenario
+    });
+
+    const result: HeartSoundResult = {
+      heartSoundPattern: mlResult.prediction === 'normal' ? 'Normal S1/S2 Lub-Dub Rhythm' : 'Acoustic Murmur Indicator',
+      patternType: mlResult.prediction === 'normal' ? 'normal_s1_s2' : 'murmur_suspected',
+      s1S2Clarity: mlResult.prediction === 'normal' ? 88 : 45,
+      murmurProbability: mlResult.abnormal_probability,
+      abnormalProbability: mlResult.abnormal_probability,
+      signalQuality: mlResult.quality === 'good' ? 92 : 75,
+      ambientNoiseDb: 34,
+      frequencySpectrum: [30, 50, 75, 90, 45, 20],
+      confidence: mlResult.confidence > 0.8 ? 'high' : 'moderate',
+      confidenceScore: mlResult.confidence,
+      status: mlResult.risk === 'FOLLOW_UP' ? 'follow_up' : mlResult.risk === 'MONITOR' ? 'monitor' : 'normal',
+      explanation: mlResult.prediction === 'normal'
+        ? 'Normal periodic S1 and S2 acoustic clicks detected without systolic/diastolic murmur plateau.'
+        : 'Sustained high-frequency acoustic energy modulation detected across cardiac cycles.',
+      timestamp: mlResult.timestamp,
+      disclaimer: mlResult.disclaimer,
+      source: 'microphone',
+      modelVersion: mlResult.model_version
+    };
+
+    dataStore.addHeartSound(user.id, result);
+    return res.json({ success: true, screening: result });
+  } catch (err: any) {
+    return res.status(400).json({
+      success: false,
+      error: { code: err.code || 'HEART_SOUND_ANALYSIS_FAILED', message: err.message }
+    });
   }
-
-  const result: HeartSoundResult = {
-    heartSoundPattern: analysis.patternType === 'normal_s1_s2' ? 'Normal S1/S2 Lub-Dub Rhythm' : 'Acoustic Murmur Indicator',
-    patternType: analysis.patternType,
-    s1S2Clarity: analysis.s1S2Clarity,
-    murmurProbability: analysis.murmurProbability,
-    signalQuality: analysis.signalQuality,
-    ambientNoiseDb: analysis.ambientNoiseDb || 38,
-    frequencySpectrum: [30, 50, 75, 90, 45, 20],
-    confidence: analysis.confidenceScore > 0.8 ? 'high' : 'moderate',
-    confidenceScore: analysis.confidenceScore,
-    status,
-    explanation: analysis.explanation,
-    timestamp: new Date().toISOString(),
-    disclaimer: 'Phonocardiogram acoustic screening aid. Does not substitute for physician stethoscope or echocardiogram.',
-    source: 'microphone',
-    modelVersion: 'heart_sound_cnn_v1'
-  };
-
-  dataStore.addHeartSound(user.id, result);
-  return res.json({ success: true, screening: result });
 });
 
 // 3. Cough Acoustic Analysis
@@ -577,88 +587,7 @@ app.post('/api/checkups/:id/complete', authenticateUser, (req: Request, res: Res
 // -------------------------------------------------------------
 app.get('/api/risk/summary', authenticateUser, (req: Request, res: Response) => {
   const user: UserAccount = (req as any).user;
-
-  const latestPPG = user.ppgHistory[user.ppgHistory.length - 1];
-  const latestHeartSound = user.heartSoundHistory[user.heartSoundHistory.length - 1];
-  const latestCough = user.coughHistory[user.coughHistory.length - 1];
-  const latestGait = user.gaitMotionHistory[user.gaitMotionHistory.length - 1];
-  const latestCameraGait = user.gaitCameraHistory[user.gaitCameraHistory.length - 1];
-  const latestBMI = user.bmiHistory[user.bmiHistory.length - 1];
-
-  const readings: SignalReading[] = [];
-
-  if (latestPPG) {
-    readings.push({
-      module: 'Heart Rate (PPG)',
-      value: latestPPG.heartRate,
-      unit: 'bpm',
-      status: latestPPG.status,
-      quality: latestPPG.signalQuality,
-      confidence: latestPPG.confidence,
-      confidenceScore: latestPPG.confidenceScore,
-      baseline: 72,
-      historicalAbnormalCount: user.ppgHistory.slice(-7).filter(p => p.status === 'follow_up').length,
-      timestamp: latestPPG.timestamp,
-      explanation: latestPPG.explanation
-    });
-  }
-
-  if (latestHeartSound) {
-    readings.push({
-      module: 'Heart Sound Screen',
-      value: latestHeartSound.patternType.replace(/_/g, ' '),
-      status: latestHeartSound.status,
-      quality: latestHeartSound.signalQuality,
-      confidence: latestHeartSound.confidence,
-      confidenceScore: latestHeartSound.confidenceScore,
-      timestamp: latestHeartSound.timestamp,
-      explanation: latestHeartSound.explanation
-    });
-  }
-
-  if (latestCough) {
-    readings.push({
-      module: 'Respiratory / Cough Screen',
-      value: latestCough.patternType.replace(/_/g, ' '),
-      status: latestCough.status,
-      quality: latestCough.signalQuality,
-      confidence: latestCough.confidence,
-      confidenceScore: latestCough.confidenceScore,
-      timestamp: latestCough.timestamp,
-      explanation: latestCough.explanation
-    });
-  }
-
-  if (latestGait) {
-    readings.push({
-      module: 'Motion Gait & Cadence',
-      value: latestGait.cadence,
-      unit: 'spm',
-      status: latestGait.status,
-      quality: 90,
-      confidence: 'high',
-      confidenceScore: 0.9,
-      baseline: 105,
-      timestamp: latestGait.timestamp,
-      explanation: latestGait.explanation
-    });
-  }
-
-  if (latestCameraGait && latestCameraGait.status !== 'insufficient') {
-    readings.push({
-      module: 'Camera Vision Gait Kinematics',
-      value: `${latestCameraGait.cadenceStepsPerMin} spm (${latestCameraGait.stepSymmetryIndex}% sym)`,
-      unit: 'spm',
-      status: latestCameraGait.status,
-      quality: latestCameraGait.signalQuality,
-      confidence: latestCameraGait.confidence,
-      confidenceScore: latestCameraGait.confidenceScore,
-      timestamp: latestCameraGait.timestamp,
-      explanation: latestCameraGait.explanation
-    });
-  }
-
-  const risk = HealthRiskEngine.evaluateRisk(readings);
+  const risk = dataStore.getPersonalizedRiskSummary(user.id);
   return res.json({
     success: true,
     risk
@@ -968,20 +897,22 @@ app.get('/api/admin/audit-logs', authenticateUser, requirePermission('admin.audi
   });
 });
 
-app.get('/api/scenario', (req: Request, res: Response) => {
+app.get('/api/scenario', authenticateUser, (req: Request, res: Response) => {
+  const user: UserAccount = (req as any).user;
   return res.json({
     success: true,
-    currentScenario: dataStore.currentScenario
+    currentScenario: dataStore.getUserScenario(user.id)
   });
 });
 
 app.post('/api/admin/demo-scenario', authenticateUser, requirePermission('admin.simulation.execute'), (req: Request, res: Response) => {
+  const user: UserAccount = (req as any).user;
   const { scenario } = req.body as { scenario: DemoScenario };
   const validScenarios = ['normal', 'monitor', 'follow_up', 'low_quality', 'mild_arrhythmia', 'respiratory_pattern', 'gait_irregularity'];
   if (!validScenarios.includes(scenario)) {
     return res.status(400).json({ success: false, message: 'Invalid demo scenario.' });
   }
-  dataStore.currentScenario = scenario;
+  dataStore.setUserScenario(user.id, scenario);
   return res.json({
     success: true,
     currentScenario: scenario,
@@ -989,13 +920,14 @@ app.post('/api/admin/demo-scenario', authenticateUser, requirePermission('admin.
   });
 });
 
-app.post('/api/scenario', (req: Request, res: Response) => {
+app.post('/api/scenario', authenticateUser, (req: Request, res: Response) => {
+  const user: UserAccount = (req as any).user;
   const { scenario } = req.body as { scenario: DemoScenario };
   const validScenarios = ['normal', 'monitor', 'follow_up', 'low_quality', 'mild_arrhythmia', 'respiratory_pattern', 'gait_irregularity'];
   if (!validScenarios.includes(scenario)) {
     return res.status(400).json({ success: false, message: 'Invalid demo scenario.' });
   }
-  dataStore.currentScenario = scenario;
+  dataStore.setUserScenario(user.id, scenario);
   return res.json({
     success: true,
     currentScenario: scenario,
@@ -1004,8 +936,8 @@ app.post('/api/scenario', (req: Request, res: Response) => {
 });
 
 app.post('/api/admin/reset', authenticateUser, requirePermission('admin.system.reset'), (req: Request, res: Response) => {
-  // Resets in-memory catalogs
-  dataStore.currentScenario = 'normal';
+  const user: UserAccount = (req as any).user;
+  dataStore.setUserScenario(user.id, 'normal');
   return res.json({
     success: true,
     message: 'Demo state refreshed.'

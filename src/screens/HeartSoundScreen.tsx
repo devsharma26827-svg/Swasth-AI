@@ -36,7 +36,7 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
     setErrorMessage('');
     setResult(null);
     samplesBufferRef.current = [];
-    setSecondsLeft(25);
+    setSecondsLeft(10);
 
     if (activeMode === 'demo') {
       setProcessingState('processing');
@@ -78,7 +78,7 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
     setProcessingState('recording');
     setIsRecording(true);
 
-    let left = 25;
+    let left = 10;
     timerRef.current = setInterval(() => {
       left--;
       setSecondsLeft(left);
@@ -96,14 +96,13 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
   };
 
   const finishAndAnalyze = async () => {
-    const rawSamples = sensorRef.current?.getRecordedSamples() || [];
-    const sampleRate = sensorRef.current?.getSampleRate() || 44100;
+    const resampled = sensorRef.current?.getResampledSamples(2000) || { samples: [], sampleRate: 2000 };
     stopRecording();
 
-    // Check minimum recording length if in real mode
-    if (activeMode === 'real' && rawSamples.length < sampleRate * 3) {
+    // Check minimum recording length if in real mode (minimum 3 seconds)
+    if (activeMode === 'real' && resampled.samples.length < resampled.sampleRate * 3) {
       setProcessingState('error');
-      setErrorMessage('Audio recording was too short (under 3 seconds). Please record for at least 5 to 25 seconds.');
+      setErrorMessage('Audio recording was too short (under 3 seconds). Please record for 10 seconds.');
       return;
     }
 
@@ -112,8 +111,8 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
     try {
       const response = await measurementApi.submitHeartSound({
         mode: activeMode,
-        audioSamples: rawSamples,
-        sampleRate,
+        audioSamples: resampled.samples,
+        sampleRate: resampled.sampleRate,
         simulatedScenario: currentScenario as DemoScenario
       });
       setResult(response.screening);

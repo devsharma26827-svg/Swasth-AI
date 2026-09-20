@@ -561,6 +561,26 @@ export class MicrophoneAudioSensor {
     return Array.from(combined);
   }
 
+  public getResampledSamples(targetSr: number = 2000): { samples: number[]; sampleRate: number } {
+    const orig = this.getRecordedSamples();
+    const origSr = this.getSampleRate();
+    if (origSr === targetSr || orig.length === 0) {
+      return { samples: orig, sampleRate: origSr };
+    }
+    const ratio = origSr / targetSr;
+    const newLen = Math.floor(orig.length / ratio);
+    const result = new Float32Array(newLen);
+    const srcLenMinus1 = orig.length - 1;
+    for (let i = 0; i < newLen; i++) {
+      const srcIdx = i * ratio;
+      const i0 = Math.floor(srcIdx);
+      const i1 = i0 < srcLenMinus1 ? i0 + 1 : srcLenMinus1;
+      const frac = srcIdx - i0;
+      result[i] = orig[i0] * (1 - frac) + orig[i1] * frac;
+    }
+    return { samples: Array.from(result), sampleRate: targetSr };
+  }
+
   public exportWavBlob(): Blob {
     const samples = this.getRecordedSamples();
     const sampleRate = this.getSampleRate();

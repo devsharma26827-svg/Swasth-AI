@@ -44,6 +44,7 @@ export interface UserProfile {
   medications?: string;
   smokingStatus?: 'non_smoker' | 'former_smoker' | 'occasional' | 'regular';
   activityLevel?: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active';
+  demoScenario?: DemoScenario;
   profileCompleted?: boolean;
   profile_completed?: boolean;
   createdAt: string;

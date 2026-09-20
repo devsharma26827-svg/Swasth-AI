@@ -154,7 +154,7 @@ async function runE2ETests() {
   const emptyRisk = HealthRiskEngine.evaluateRisk([]);
   assert(emptyRisk.overallStatus === 'no_valid_results', 'Empty module list results in no_valid_results (not normal)');
   assert(emptyRisk.riskScore === 0, 'Risk score with 0 inputs is 0');
-  assert(emptyRisk.trendInsight.includes('No valid sensor'), 'Insight indicates no valid sensor measurements recorded');
+  assert(emptyRisk.trendInsight.includes('No valid'), 'Insight indicates no valid screening measurements recorded');
 
   // Rule: Single Module (e.g. only Heart Sound abnormal)
   const singleAbnormalRisk = HealthRiskEngine.evaluateRisk([

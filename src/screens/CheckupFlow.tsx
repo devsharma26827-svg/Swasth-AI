@@ -281,13 +281,17 @@ export const CheckupFlow: React.FC<Props> = ({
                     ? 'bg-green-100 text-green-800'
                     : overallStatus === 'monitor'
                     ? 'bg-amber-100 text-amber-800'
+                    : overallStatus === 'no_valid_results'
+                    ? 'bg-gray-100 text-gray-800'
                     : 'bg-red-100 text-red-800'
                 }`}
               >
                 {overallStatus === 'normal'
-                  ? 'Normal (Safe)'
+                  ? 'Normal Range'
                   : overallStatus === 'monitor'
                   ? 'Monitor Trend'
+                  : overallStatus === 'no_valid_results'
+                  ? 'No Valid Results'
                   : 'Follow-up Recommended'}
               </span>
             </div>
@@ -295,16 +299,57 @@ export const CheckupFlow: React.FC<Props> = ({
             {/* Meaningful progress notice */}
             {isFinalizing ? (
               <div className="py-8 text-center text-xs text-gray-500">
-                Cleaning signal... Checking measurement quality... Analyzing your recent trend...
+                Cleaning signal... Checking measurement quality... Analyzing current session readings...
               </div>
             ) : (
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-4">
+                {/* Module Completion Breakdown */}
+                <div className="rounded-2xl border border-gray-200 bg-[#F8F7F2] p-4">
+                  <div className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Current Checkup Modules Status
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Camera PPG:</span>
+                      <span className={completedModules.ppg ? "font-bold text-green-700" : "text-gray-400 font-medium"}>
+                        {completedModules.ppg ? `✓ Completed (${completedModules.ppg.heartRate} BPM)` : '○ Not Tested'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Heart Sound:</span>
+                      <span className={completedModules.heartSound ? "font-bold text-green-700" : "text-gray-400 font-medium"}>
+                        {completedModules.heartSound ? `✓ Completed (${completedModules.heartSound.heartSoundPattern || completedModules.heartSound.status})` : '○ Not Tested'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Cough Screening:</span>
+                      <span className={completedModules.cough ? "font-bold text-green-700" : "text-gray-400 font-medium"}>
+                        {completedModules.cough ? `✓ Completed (${completedModules.cough.coughPattern || completedModules.cough.status})` : '○ Not Tested'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Gait Kinematics:</span>
+                      <span className={completedModules.gait ? "font-bold text-green-700" : "text-gray-400 font-medium"}>
+                        {completedModules.gait ? `✓ Completed` : '○ Not Tested'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">BMI Assessment:</span>
+                      <span className={completedModules.bmi ? "font-bold text-green-700" : "text-gray-400 font-medium"}>
+                        {completedModules.bmi ? `✓ Completed (${completedModules.bmi.bmi} BMI)` : '○ Not Tested'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-2xl bg-[#F8F7F2] p-4 text-xs text-gray-700 leading-relaxed border border-gray-200">
-                  {overallStatus === 'normal'
-                    ? 'Your recorded resting heart rate, acoustic screening profiles, and cadence are in alignment with your personal 30-day baseline range.'
+                  {overallStatus === 'no_valid_results'
+                    ? 'No valid screening measurements were completed in this session. Untested modules do not contribute to risk score.'
+                    : overallStatus === 'normal'
+                    ? 'Your recorded signals in this session are within expected physiological reference targets.'
                     : overallStatus === 'monitor'
-                    ? 'Minor variances were detected compared to your regular 7-day average. We recommend re-checking tomorrow at a similar resting time.'
-                    : 'One or more screening patterns differed noticeably from your baseline. Consider discussing these observations with a qualified physician.'}
+                    ? 'Minor variances were detected in completed screening modules. Continue monitoring trends across future sessions.'
+                    : 'One or more completed screening patterns differed noticeably from reference targets. Consider discussing these observations with a qualified physician.'}
                 </div>
 
                 {/* Primary CTA conditional on status */}

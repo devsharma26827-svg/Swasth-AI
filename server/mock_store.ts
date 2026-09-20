@@ -15,6 +15,7 @@ import {
   LabTest,
   LabBooking,
   HealthReport,
+  RiskSummary,
   TrendDataset,
   DemoScenario,
   HealthStatus,
@@ -29,6 +30,7 @@ import {
   createJwtToken,
   verifyJwtToken
 } from './rbac';
+import { HealthRiskEngine, SignalReading } from './risk_engine';
 
 export interface UserAccount {
   id: string; // Unique immutable UUID
@@ -36,6 +38,7 @@ export interface UserAccount {
   passwordHash: string;
   role: UserRole;
   permissions?: Permission[];
+  demoScenario?: DemoScenario;
   createdAt: string;
   updatedAt: string;
   lastActivity: string;
@@ -1114,18 +1117,140 @@ export class HealthDataStore {
     return report || null;
   }
 
+  public getUserScenario(userId: string): DemoScenario {
+    const user = this.getUserById(userId);
+    return user?.profile.demoScenario || user?.demoScenario || this.currentScenario || 'normal';
+  }
+
+  public setUserScenario(userId: string, scenario: DemoScenario): void {
+    const user = this.getUserById(userId);
+    if (user) {
+      user.demoScenario = scenario;
+      user.profile.demoScenario = scenario;
+    }
+  }
+
+  public getPersonalizedRiskSummary(userId: string): RiskSummary {
+    const user = this.getUserById(userId);
+    if (!user) throw new Error('User not found');
+
+    const currentCheckup = this.getCurrentCheckup(userId);
+    const readings: SignalReading[] = [];
+
+    if (currentCheckup) {
+      if (currentCheckup.modules.ppg?.status === 'completed' && currentCheckup.modules.ppg.result) {
+        const ppg = currentCheckup.modules.ppg.result;
+        readings.push({
+          module: 'Heart Rate (PPG)',
+          value: ppg.heartRate,
+          unit: 'bpm',
+          status: ppg.status,
+          quality: ppg.signalQuality,
+          confidence: ppg.confidence,
+          confidenceScore: ppg.confidenceScore,
+          timestamp: ppg.timestamp,
+          explanation: ppg.explanation
+        });
+      }
+
+      if (currentCheckup.modules.heartSound?.status === 'completed' && currentCheckup.modules.heartSound.result) {
+        const hs = currentCheckup.modules.heartSound.result;
+        readings.push({
+          module: 'Heart Sound Screen',
+          value: hs.heartSoundPattern || hs.patternType.replace(/_/g, ' '),
+          status: hs.status,
+          quality: hs.signalQuality,
+          confidence: hs.confidence,
+          confidenceScore: hs.confidenceScore,
+          timestamp: hs.timestamp,
+          explanation: hs.explanation
+        });
+      }
+
+      if (currentCheckup.modules.cough?.status === 'completed' && currentCheckup.modules.cough.result) {
+        const cough = currentCheckup.modules.cough.result;
+        readings.push({
+          module: 'Respiratory / Cough Screen',
+          value: cough.coughPattern || cough.patternType.replace(/_/g, ' '),
+          status: cough.status,
+          quality: cough.signalQuality,
+          confidence: cough.confidence,
+          confidenceScore: cough.confidenceScore,
+          timestamp: cough.timestamp,
+          explanation: cough.explanation
+        });
+      }
+
+      if (currentCheckup.modules.gait?.status === 'completed' && currentCheckup.modules.gait.result) {
+        const gait = currentCheckup.modules.gait.result;
+        readings.push({
+          module: 'Motion Gait & Cadence',
+          value: gait.cadence,
+          unit: 'spm',
+          status: gait.status,
+          quality: gait.sensorQuality || 90,
+          confidence: gait.confidence || 'high',
+          confidenceScore: 0.9,
+          timestamp: gait.timestamp,
+          explanation: gait.explanation
+        });
+      }
+
+      if (currentCheckup.modules.gaitCamera?.status === 'completed' && currentCheckup.modules.gaitCamera.result) {
+        const cg = currentCheckup.modules.gaitCamera.result;
+        if (cg.status !== 'insufficient') {
+          readings.push({
+            module: 'Camera Vision Gait Kinematics',
+            value: `${cg.cadenceStepsPerMin} spm (${cg.stepSymmetryIndex}% sym)`,
+            unit: 'spm',
+            status: cg.status,
+            quality: cg.signalQuality,
+            confidence: cg.confidence,
+            confidenceScore: cg.confidenceScore,
+            timestamp: cg.timestamp,
+            explanation: cg.explanation
+          });
+        }
+      }
+
+      if (currentCheckup.modules.bmi?.status === 'completed' && currentCheckup.modules.bmi.result) {
+        const bmi = currentCheckup.modules.bmi.result;
+        readings.push({
+          module: 'Body Mass Index (BMI)',
+          value: bmi.bmi,
+          unit: 'kg/m2',
+          status: bmi.status,
+          quality: 100,
+          confidence: 'high',
+          confidenceScore: 0.95,
+          timestamp: bmi.timestamp,
+          explanation: bmi.explanation
+        });
+      }
+    }
+
+    const userHistory = {
+      ppgCount: user.ppgHistory.length,
+      heartSoundCount: user.heartSoundHistory.length,
+      coughCount: user.coughHistory.length,
+      totalSessions: user.checkups.filter(c => c.completedAt).length
+    };
+
+    return HealthRiskEngine.evaluateRisk(readings, user.profile, userHistory);
+  }
+
   public createReport(userId: string, checkupId?: string): HealthReport {
     const user = this.getUserById(userId);
     if (!user) throw new Error('User not found');
 
     const checkup = checkupId ? user.checkups.find(c => c.id === checkupId) : user.checkups[user.checkups.length - 1];
 
-    const latestPPG = user.ppgHistory[user.ppgHistory.length - 1];
-    const latestHS = user.heartSoundHistory[user.heartSoundHistory.length - 1];
-    const latestCough = user.coughHistory[user.coughHistory.length - 1];
-    const latestGait = user.gaitMotionHistory[user.gaitMotionHistory.length - 1];
-    const latestCameraGait = user.gaitCameraHistory[user.gaitCameraHistory.length - 1];
-    const latestBMI = user.bmiHistory[user.bmiHistory.length - 1];
+    const sessionPPG = checkup?.modules?.ppg?.status === 'completed' ? checkup.modules.ppg.result : null;
+    const sessionHS = checkup?.modules?.heartSound?.status === 'completed' ? checkup.modules.heartSound.result : null;
+    const sessionCough = checkup?.modules?.cough?.status === 'completed' ? checkup.modules.cough.result : null;
+    const sessionGait = checkup?.modules?.gait?.status === 'completed' ? checkup.modules.gait.result : (checkup?.modules?.gaitMotion?.status === 'completed' ? checkup.modules.gaitMotion.result : null);
+    const sessionCameraGait = checkup?.modules?.gaitCamera?.status === 'completed' ? checkup.modules.gaitCamera.result : null;
+    const sessionBMI = checkup?.modules?.bmi?.status === 'completed' ? checkup.modules.bmi.result : null;
 
     const reportId = `rep_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const reportNumber = `SAI-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -1135,19 +1260,19 @@ export class HealthDataStore {
     let testedCount = 0;
 
     // PPG
-    if (latestPPG) {
+    if (sessionPPG) {
       testedCount++;
       modulesList.push({
         id: 'ppg',
         name: 'Cardiovascular PPG Screening',
         tested: true,
         status: 'completed',
-        healthStatus: latestPPG.status,
-        valueDisplay: `${latestPPG.heartRate} BPM`,
-        details: `HRV RMSSD: ${latestPPG.hrvRmssd} ms | Est. SpO₂: ${latestPPG.estimatedSpO2}%`,
-        confidence: latestPPG.confidence,
-        quality: latestPPG.signalQuality,
-        timestamp: latestPPG.timestamp
+        healthStatus: sessionPPG.status,
+        valueDisplay: `${sessionPPG.heartRate} BPM`,
+        details: `HRV RMSSD: ${sessionPPG.hrvRmssd} ms | Est. SpO₂: ${sessionPPG.estimatedSpO2}%`,
+        confidence: sessionPPG.confidence,
+        quality: sessionPPG.signalQuality,
+        timestamp: sessionPPG.timestamp
       });
     } else {
       modulesList.push({
@@ -1160,19 +1285,19 @@ export class HealthDataStore {
     }
 
     // Heart Sound
-    if (latestHS) {
+    if (sessionHS) {
       testedCount++;
       modulesList.push({
         id: 'heart_sound',
         name: 'Acoustic Heart Sound Auscultation',
         tested: true,
         status: 'completed',
-        healthStatus: latestHS.status,
-        valueDisplay: latestHS.heartSoundPattern,
-        details: `S1/S2 clarity ${latestHS.s1S2Clarity}% | Murmur confidence ${Math.round((1 - latestHS.murmurProbability) * 100)}%`,
-        confidence: latestHS.confidence,
-        quality: latestHS.signalQuality,
-        timestamp: latestHS.timestamp
+        healthStatus: sessionHS.status,
+        valueDisplay: sessionHS.heartSoundPattern || sessionHS.patternType.replace(/_/g, ' '),
+        details: `S1/S2 clarity ${sessionHS.s1S2Clarity || 85}% | Murmur confidence ${Math.round((1 - (sessionHS.murmurProbability || 0.1)) * 100)}%`,
+        confidence: sessionHS.confidence,
+        quality: sessionHS.signalQuality,
+        timestamp: sessionHS.timestamp
       });
     } else {
       modulesList.push({
@@ -1185,19 +1310,19 @@ export class HealthDataStore {
     }
 
     // Cough
-    if (latestCough) {
+    if (sessionCough) {
       testedCount++;
       modulesList.push({
         id: 'cough',
         name: 'Respiratory Cough Biomarker Analysis',
         tested: true,
         status: 'completed',
-        healthStatus: latestCough.status,
-        valueDisplay: latestCough.coughPattern,
-        details: `Cough events: ${latestCough.coughEventsCount} | Duration: ${latestCough.durationSeconds}s`,
-        confidence: latestCough.confidence,
-        quality: latestCough.signalQuality,
-        timestamp: latestCough.timestamp
+        healthStatus: sessionCough.status,
+        valueDisplay: sessionCough.coughPattern || sessionCough.patternType.replace(/_/g, ' '),
+        details: `Cough events: ${sessionCough.coughEventsCount || 0} | Duration: ${sessionCough.durationSeconds || 4}s`,
+        confidence: sessionCough.confidence,
+        quality: sessionCough.signalQuality,
+        timestamp: sessionCough.timestamp
       });
     } else {
       modulesList.push({
@@ -1210,19 +1335,19 @@ export class HealthDataStore {
     }
 
     // Motion Gait
-    if (latestGait) {
+    if (sessionGait) {
       testedCount++;
       modulesList.push({
         id: 'gait_motion',
         name: 'Motion Sensor Gait Analysis',
         tested: true,
         status: 'completed',
-        healthStatus: latestGait.status,
-        valueDisplay: `${latestGait.cadence} SPM`,
-        details: `Regularity: ${latestGait.strideRegularity}% | Symmetry: ${latestGait.stepSymmetry}%`,
-        confidence: latestGait.confidence,
-        quality: latestGait.sensorQuality,
-        timestamp: latestGait.timestamp
+        healthStatus: sessionGait.status,
+        valueDisplay: `${sessionGait.cadence} SPM`,
+        details: `Regularity: ${sessionGait.strideRegularity}% | Symmetry: ${sessionGait.stepSymmetry || sessionGait.symmetryIndex}%`,
+        confidence: sessionGait.confidence || 'high',
+        quality: sessionGait.sensorQuality || 90,
+        timestamp: sessionGait.timestamp
       });
     } else {
       modulesList.push({
@@ -1234,21 +1359,21 @@ export class HealthDataStore {
       });
     }
 
-    // Camera Gait (PART 10 & 45)
-    if (latestCameraGait) {
+    // Camera Gait
+    if (sessionCameraGait) {
       testedCount++;
       modulesList.push({
         id: 'gait_camera',
         name: 'Camera Vision Gait Kinematics',
         tested: true,
-        status: latestCameraGait.status === 'insufficient' ? 'error' : 'completed',
-        healthStatus: latestCameraGait.status,
-        valueDisplay: latestCameraGait.status === 'insufficient' ? 'Insufficient Quality' : `${latestCameraGait.cadenceStepsPerMin} SPM`,
-        details: `Symmetry: ${latestCameraGait.stepSymmetryIndex}% | Pelvic Tilt Max: ${latestCameraGait.pelvicDropMax}° | Sway: ${latestCameraGait.trunkSwayAmplitude}`,
-        confidence: latestCameraGait.confidence,
-        quality: latestCameraGait.signalQuality,
-        timestamp: latestCameraGait.timestamp,
-        modelVersion: latestCameraGait.modelVersion
+        status: sessionCameraGait.status === 'insufficient' ? 'error' : 'completed',
+        healthStatus: sessionCameraGait.status,
+        valueDisplay: sessionCameraGait.status === 'insufficient' ? 'Insufficient Quality' : `${sessionCameraGait.cadenceStepsPerMin} SPM`,
+        details: `Symmetry: ${sessionCameraGait.stepSymmetryIndex}% | Pelvic Drop: ${sessionCameraGait.pelvicDropMax}° | Sway: ${sessionCameraGait.trunkSwayAmplitude}`,
+        confidence: sessionCameraGait.confidence,
+        quality: sessionCameraGait.signalQuality,
+        timestamp: sessionCameraGait.timestamp,
+        modelVersion: sessionCameraGait.modelVersion
       });
     } else {
       modulesList.push({
@@ -1261,19 +1386,19 @@ export class HealthDataStore {
     }
 
     // BMI
-    if (latestBMI) {
+    if (sessionBMI) {
       testedCount++;
       modulesList.push({
         id: 'bmi',
         name: 'Anthropometric & BMI Assessment',
         tested: true,
         status: 'completed',
-        healthStatus: latestBMI.status,
-        valueDisplay: `${latestBMI.bmi} BMI`,
-        details: `${latestBMI.category} (${latestBMI.weightKg} kg, ${latestBMI.heightCm} cm)`,
+        healthStatus: sessionBMI.status,
+        valueDisplay: `${sessionBMI.bmi} BMI`,
+        details: `${sessionBMI.category} (${sessionBMI.weightKg} kg, ${sessionBMI.heightCm} cm)`,
         confidence: 'high',
         quality: 100,
-        timestamp: latestBMI.timestamp
+        timestamp: sessionBMI.timestamp
       });
     } else {
       modulesList.push({
@@ -1285,7 +1410,8 @@ export class HealthDataStore {
       });
     }
 
-    const overallStatus = checkup?.overallStatus || (testedCount === 0 ? 'normal' : 'normal');
+    const riskSummary = this.getPersonalizedRiskSummary(userId);
+    const overallStatus = riskSummary.overallStatus;
 
     const report: HealthReport = {
       id: reportId,
@@ -1306,53 +1432,44 @@ export class HealthDataStore {
       totalModulesCount: 6,
       modules: modulesList,
       metrics: {
-        heartRate: latestPPG?.heartRate || null,
-        hrvRmssd: latestPPG?.hrvRmssd || null,
-        estimatedSpO2: latestPPG?.estimatedSpO2 || null,
-        bmi: latestBMI?.bmi || null,
-        gaitCadence: latestGait?.cadence || null,
-        cameraGaitCadence: latestCameraGait?.cadenceStepsPerMin || null,
-        cameraGaitSymmetry: latestCameraGait?.stepSymmetryIndex || null,
-        cameraGaitStatus: latestCameraGait?.status || null,
-        heartSoundStatus: latestHS?.status || null,
-        coughStatus: latestCough?.status || null
+        heartRate: sessionPPG?.heartRate || null,
+        hrvRmssd: sessionPPG?.hrvRmssd || null,
+        estimatedSpO2: sessionPPG?.estimatedSpO2 || null,
+        bmi: sessionBMI?.bmi || null,
+        gaitCadence: sessionGait?.cadence || null,
+        cameraGaitCadence: sessionCameraGait?.cadenceStepsPerMin || null,
+        cameraGaitSymmetry: sessionCameraGait?.stepSymmetryIndex || null,
+        cameraGaitStatus: sessionCameraGait?.status || null,
+        heartSoundStatus: sessionHS?.status || null,
+        coughStatus: sessionCough?.status || null
       },
-      riskSummary: {
-        overallStatus,
-        riskScore: overallStatus === 'follow_up' ? 68 : overallStatus === 'monitor' ? 38 : 12,
-        confidence: 'high',
-        primarySignals: [],
-        trendInsight: testedCount < 2 ? 'Initial baseline registered. Repeat checkup weekly.' : 'Biomarkers stabilized within personal baseline.',
-        recommendedAction: overallStatus === 'follow_up' ? 'Schedule clinician follow-up.' : 'Continue routine screening.',
-        followUpRequired: overallStatus === 'follow_up',
-        timestamp: now
-      },
+      riskSummary,
       limitations: 'Smartphone optical, acoustic, and kinematic screening values are informational approximations and do not constitute formal medical diagnostics.',
       userName: user.profile.name,
       age: user.profile.age,
       sex: user.profile.sex,
       createdAt: now,
       overallStatus,
-      confidenceScore: 0.88,
+      confidenceScore: riskSummary.confidence === 'high' ? 0.92 : riskSummary.confidence === 'moderate' ? 0.75 : 0.5,
       executiveSummary: checkup?.summaryExplanation || 'Biomarker screening completed.',
       disclaimer: 'SwasthAI is a health-tracking screening platform. It does not replace professional clinical evaluation.',
       vitals: {
-        heartRate: latestPPG?.heartRate || null,
-        heartRateStatus: latestPPG?.status || 'not_tested',
-        hrvRmssd: latestPPG?.hrvRmssd || null,
-        hrvStatus: latestPPG?.status || 'not_tested',
-        estimatedSpO2: latestPPG?.estimatedSpO2 || null,
-        weightKg: latestBMI?.weightKg || null,
-        bmi: latestBMI?.bmi || null,
-        cadence: latestGait?.cadence || null,
-        gaitStatus: latestGait?.status || 'not_tested',
-        cameraGaitCadence: latestCameraGait?.cadenceStepsPerMin || null,
-        cameraGaitSymmetry: latestCameraGait?.stepSymmetryIndex || null,
-        cameraGaitStatus: latestCameraGait?.status || 'not_tested',
-        heartSoundPattern: latestHS?.heartSoundPattern || null,
-        heartSoundStatus: latestHS?.status || 'not_tested',
-        coughPattern: latestCough?.coughPattern || null,
-        coughStatus: latestCough?.status || 'not_tested'
+        heartRate: sessionPPG?.heartRate || null,
+        heartRateStatus: sessionPPG?.status || 'not_tested',
+        hrvRmssd: sessionPPG?.hrvRmssd || null,
+        hrvStatus: sessionPPG?.status || 'not_tested',
+        estimatedSpO2: sessionPPG?.estimatedSpO2 || null,
+        weightKg: sessionBMI?.weightKg || null,
+        bmi: sessionBMI?.bmi || null,
+        cadence: sessionGait?.cadence || null,
+        gaitStatus: sessionGait?.status || 'not_tested',
+        cameraGaitCadence: sessionCameraGait?.cadenceStepsPerMin || null,
+        cameraGaitSymmetry: sessionCameraGait?.stepSymmetryIndex || null,
+        cameraGaitStatus: sessionCameraGait?.status || 'not_tested',
+        heartSoundPattern: sessionHS?.heartSoundPattern || null,
+        heartSoundStatus: sessionHS?.status || 'not_tested',
+        coughPattern: sessionCough?.coughPattern || null,
+        coughStatus: sessionCough?.status || 'not_tested'
       },
       actionItems: overallStatus === 'follow_up'
         ? ['Consult a licensed physician for clinical validation', 'Monitor symptoms daily', 'Avoid strenuous exertion']
