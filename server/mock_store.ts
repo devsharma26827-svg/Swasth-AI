@@ -975,9 +975,55 @@ export class HealthDataStore {
     current.cough = cough;
   }
 
+  public ensureUser(userId: string): UserAccount {
+    let user = this.getUserById(userId);
+    if (!user) {
+      const now = new Date().toISOString();
+      user = {
+        id: userId,
+        email: '',
+        passwordHash: '',
+        role: 'USER',
+        permissions: getPermissionsForRole('USER'),
+        createdAt: now,
+        updatedAt: now,
+        lastActivity: now,
+        profile: {
+          id: userId,
+          name: 'Patient User',
+          email: '',
+          role: 'USER',
+          age: 30,
+          sex: 'male',
+          height: 170,
+          weight: 70,
+          existingConditions: [],
+          medications: '',
+          createdAt: now,
+          updatedAt: now,
+          profileCompleted: true
+        },
+        checkups: [],
+        ppgHistory: [],
+        heartSoundHistory: [],
+        coughHistory: [],
+        gaitMotionHistory: [],
+        gaitCameraHistory: [],
+        bmiHistory: [],
+        reports: [],
+        appointments: [],
+        labBookings: [],
+        consentLogs: []
+      };
+      this.users.set(userId, user);
+    }
+    if (!user.gaitCameraHistory) user.gaitCameraHistory = [];
+    if (!user.gaitMotionHistory) user.gaitMotionHistory = [];
+    return user;
+  }
+
   public addMotionGait(userId: string, gait: GaitResult): void {
-    const user = this.getUserById(userId);
-    if (!user) throw new Error('User not found');
+    const user = this.ensureUser(userId);
 
     user.gaitMotionHistory.push(gait);
 
@@ -1004,8 +1050,7 @@ export class HealthDataStore {
   }
 
   public addCameraGait(userId: string, cameraGait: CameraGaitResult): void {
-    const user = this.getUserById(userId);
-    if (!user) throw new Error('User not found');
+    const user = this.ensureUser(userId);
 
     user.gaitCameraHistory.push(cameraGait);
 

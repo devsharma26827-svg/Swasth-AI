@@ -480,30 +480,69 @@ app.post(['/api/screening/gait', '/screening/gait', '/screen/gait'], authenticat
 
 // 5. Camera Vision Gait Kinematics (PART 1 - 12)
 app.post(['/api/measurements/gait/camera', '/measurements/gait/camera'], authenticateUser, (req: Request, res: Response) => {
-  const user: UserAccount = (req as any).user;
-  const {
-    frames = [],
-    durationSeconds = 6.0,
-    fps = 30,
-    mode = 'real',
-    simulatedScenario
-  } = req.body;
+  try {
+    const user: UserAccount = (req as any).user;
+    const userId = user?.id;
 
-  const result = GaitService.evaluateCameraGait({
-    frames,
-    durationSeconds: Number(durationSeconds) || 6.0,
-    fps: Number(fps) || 30,
-    mode: mode === 'demo' ? 'demo' : 'real',
-    simulatedScenario: simulatedScenario || dataStore.currentScenario
-  });
+    const {
+      frames = [],
+      durationSeconds = 6.0,
+      fps = 30,
+      mode = 'real',
+      simulatedScenario
+    } = req.body || {};
 
-  dataStore.addCameraGait(user.id, result);
+    const safeFrames = Array.isArray(frames) ? frames : [];
 
-  return res.json({
-    success: true,
-    result,
-    gaitCamera: result
-  });
+    const result = GaitService.evaluateCameraGait({
+      frames: safeFrames,
+      durationSeconds: Number(durationSeconds) || 6.0,
+      fps: Number(fps) || 30,
+      mode: mode === 'demo' ? 'demo' : 'real',
+      simulatedScenario: simulatedScenario || dataStore.currentScenario
+    });
+
+    if (userId) {
+      dataStore.addCameraGait(userId, result);
+    }
+
+    return res.json({
+      success: true,
+      result,
+      gaitCamera: result
+    });
+  } catch (err: any) {
+    console.error('[CameraGait Endpoint Error]', err);
+    const fallbackResult: CameraGaitResult = {
+      cadenceStepsPerMin: 0,
+      stepSymmetryIndex: 0,
+      pelvicDropAsymmetry: 0,
+      pelvicDropMax: 0,
+      trunkSwayAmplitude: 0,
+      kneeRomAsymmetry: 0,
+      stanceAsymmetry: 0,
+      signalQuality: 0,
+      framesProcessed: 0,
+      framesWithPose: 0,
+      poseDetectionRate: 0,
+      durationSeconds: 6.0,
+      status: 'insufficient',
+      confidence: 'low',
+      confidenceScore: 0.35,
+      modelVersion: 'camera_gait_v1',
+      modelMode: 'real',
+      source: 'camera_gait',
+      explanation: "We couldn't reliably capture the walking sequence. Please retry with your full body visible and good lighting.",
+      timestamp: new Date().toISOString(),
+      disclaimer: 'Screening only. Fixed camera gait recording was insufficient for kinematic calculation.',
+      screeningOnly: true
+    };
+    return res.json({
+      success: true,
+      result: fallbackResult,
+      gaitCamera: fallbackResult
+    });
+  }
 });
 
 // 6. BMI & Weight Tracker

@@ -40,7 +40,7 @@ export const Header: React.FC<Props> = ({
               </span>
             </div>
             <p className="text-[11px] text-[#5C645D]">
-              Your Smart Health Checking Assistant
+              Your Smart Health Screening Assistant
             </p>
           </div>
         </div>

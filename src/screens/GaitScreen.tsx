@@ -49,8 +49,6 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
   const [cameraResult, setCameraResult] = useState<CameraGaitResult | null>(null);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState<boolean | null>(null);
   const [detectedJoints, setDetectedJoints] = useState<{ x: number; y: number; name: string }[]>([]);
-  const [liveSymmetry, setLiveSymmetry] = useState(94);
-  const [liveCadence, setLiveCadence] = useState(108);
   const [framesCollected, setFramesCollected] = useState(0);
 
   // Refs
@@ -63,87 +61,112 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
   const timerRef = useRef<any>(null);
   const animFrameRef = useRef<any>(null);
 
-  // Initialize sensors & cleanups
+  // Lifecycle guards
+  const isMountedRef = useRef<boolean>(true);
+  const isTestingRef = useRef<boolean>(false);
+  const hasFinishedRef = useRef<boolean>(false);
+
   useEffect(() => {
+    isMountedRef.current = true;
     sensorRef.current = new MotionWalkingSensor();
     return () => {
+      isMountedRef.current = false;
       stopAll();
     };
   }, []);
 
-  // Handle camera video stream lifecycle when entering camera modality
+  // Handle camera video stream preview lifecycle when entering camera modality
   useEffect(() => {
-    let isCancelled = false;
-    if (gaitModality === 'camera' && processingState === 'idle') {
-      initCameraPreview(() => isCancelled);
-    } else if (gaitModality === 'motion') {
+    if (gaitModality === 'camera') {
+      if (processingState === 'idle') {
+        initCameraPreview();
+      }
+    } else {
       stopCameraStream();
     }
-    return () => {
-      isCancelled = true;
-      stopCameraStream();
-    };
-  }, [gaitModality, processingState]);
+  }, [gaitModality]);
 
-  const initCameraPreview = async (isCancelled?: () => boolean) => {
+  const initCameraPreview = async () => {
+    if (!isMountedRef.current) return;
+    stopCameraStream();
+
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: 'user', // front camera by default so user can see alignment
+            facingMode: 'user',
             width: { ideal: 640 },
             height: { ideal: 480 }
           },
           audio: false
         });
-        if (isCancelled && isCancelled()) {
-          stream.getTracks().forEach(track => {
-            try {
-              if (track.readyState === 'live') track.stop();
-            } catch {}
+
+        if (!isMountedRef.current) {
+          stream.getTracks().forEach(t => {
+            try { t.stop(); } catch (_) {}
           });
           return;
         }
+
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
         }
-        setCameraPermissionGranted(true);
+        if (isMountedRef.current) {
+          setCameraPermissionGranted(true);
+        }
       } else {
-        setCameraPermissionGranted(false);
+        if (isMountedRef.current) {
+          setCameraPermissionGranted(false);
+        }
       }
     } catch (e) {
-      console.warn('Camera preview not accessible, falling back to simulated vision stream:', e);
-      setCameraPermissionGranted(false);
+      console.warn('Camera preview not accessible:', e);
+      if (isMountedRef.current) {
+        setCameraPermissionGranted(false);
+      }
     }
   };
 
   const stopCameraStream = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        try {
-          if (track.readyState === 'live') {
-            track.stop();
-          }
-        } catch {}
-      });
+      try {
+        streamRef.current.getTracks().forEach(track => {
+          try {
+            if (track.readyState === 'live') {
+              track.stop();
+            }
+          } catch (_) {}
+        });
+      } catch (_) {}
       streamRef.current = null;
     }
     if (videoRef.current) {
       try {
         videoRef.current.pause();
-      } catch {}
+      } catch (_) {}
       try {
         videoRef.current.srcObject = null;
-      } catch {}
+      } catch (_) {}
     }
   };
 
   const stopAll = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    if (sensorRef.current) sensorRef.current.stop();
+    isTestingRef.current = false;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (sensorRef.current) {
+      try {
+        sensorRef.current.stop();
+      } catch (_) {}
+    }
     stopCameraStream();
   };
 
@@ -151,6 +174,20 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
   // CAMERA GAIT: "Walk Toward Camera" Workflow
   // =========================================================================
   const startCameraGaitTest = async () => {
+    if (isTestingRef.current) return;
+
+    // Reset state & guards
+    isTestingRef.current = true;
+    hasFinishedRef.current = false;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+
     setErrorMessage('');
     setCameraResult(null);
     frameLandmarksRef.current = [];
@@ -166,15 +203,28 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
           fps: 30,
           simulatedScenario: currentScenario as DemoScenario
         });
-        const result = res.result || res.gaitCamera;
+        if (!isMountedRef.current) return;
+        isTestingRef.current = false;
+        const result = res?.result || res?.gaitCamera;
+        if (!result) {
+          throw new Error('Invalid response from demo camera gait service.');
+        }
         setCameraResult(result);
         setProcessingState('success');
         if (onComplete) onComplete(result);
       } catch (err: any) {
+        if (!isMountedRef.current) return;
+        isTestingRef.current = false;
         setProcessingState('error');
         setErrorMessage(err.message || 'Demo camera gait failed.');
       }
       return;
+    }
+
+    // REAL CAMERA BRANCH
+    // Ensure stream is running
+    if (!streamRef.current || !streamRef.current.active) {
+      await initCameraPreview();
     }
 
     // Step 1: Countdown (5s) for user to position 3-4 meters away
@@ -183,142 +233,202 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
     setCountdownSeconds(count);
 
     timerRef.current = setInterval(() => {
+      if (!isMountedRef.current || !isTestingRef.current) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        return;
+      }
       count--;
       setCountdownSeconds(count);
       if (count <= 0) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
         beginCameraRecording();
       }
     }, 1000);
   };
 
   const beginCameraRecording = () => {
+    if (!isMountedRef.current || !isTestingRef.current) return;
+
     setProcessingState('recording');
     let duration = 6;
     setCameraSecondsLeft(duration);
     const startTime = Date.now();
 
-    // Start Landmark Extraction Loop
+    // Start Landmark Extraction Loop safely inside try/catch
     const runFrameExtraction = () => {
-      if (videoRef.current && canvasRef.current) {
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
+      if (!isMountedRef.current || !isTestingRef.current) return;
 
-        if (ctx && video.readyState >= 2) {
-          canvas.width = video.videoWidth || 320;
-          canvas.height = video.videoHeight || 240;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      try {
+        if (videoRef.current && canvasRef.current) {
+          const video = videoRef.current;
+          const canvas = canvasRef.current;
+          const ctx = canvas.getContext('2d');
 
-          // Simulated full-body kinematic tracking points based on optical center
-          const elapsed = (Date.now() - startTime) / 1000;
-          const walkProgression = Math.min(1.0, elapsed / 6);
-          const bodyScale = 0.35 + walkProgression * 0.45; // approaches camera
-          const bobbing = Math.sin(elapsed * 2 * Math.PI * 1.8) * 8; // step vertical oscillation
+          if (ctx && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+            canvas.width = video.videoWidth || 320;
+            canvas.height = video.videoHeight || 240;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-          const midX = canvas.width * 0.5;
-          const headY = canvas.height * (0.25 - walkProgression * 0.1) + bobbing;
-          const hipY = headY + 70 * bodyScale;
-          const leftKneeY = hipY + 50 * bodyScale + Math.sin(elapsed * 2 * Math.PI * 1.8) * 12;
-          const rightKneeY = hipY + 50 * bodyScale - Math.sin(elapsed * 2 * Math.PI * 1.8) * 12;
-          const leftAnkleY = leftKneeY + 45 * bodyScale;
-          const rightAnkleY = rightKneeY + 45 * bodyScale;
+            // Simulated full-body kinematic tracking points based on optical center
+            const elapsed = (Date.now() - startTime) / 1000;
+            const walkProgression = Math.min(1.0, elapsed / 6);
+            const bodyScale = 0.35 + walkProgression * 0.45;
+            const bobbing = Math.sin(elapsed * 2 * Math.PI * 1.8) * 8;
 
-          const joints = [
-            { x: midX, y: headY, name: 'nose' },
-            { x: midX - 25 * bodyScale, y: hipY, name: 'left_hip' },
-            { x: midX + 25 * bodyScale, y: hipY, name: 'right_hip' },
-            { x: midX - 22 * bodyScale, y: leftKneeY, name: 'left_knee' },
-            { x: midX + 22 * bodyScale, y: rightKneeY, name: 'right_knee' },
-            { x: midX - 20 * bodyScale, y: leftAnkleY, name: 'left_ankle' },
-            { x: midX + 20 * bodyScale, y: rightAnkleY, name: 'right_ankle' }
-          ];
+            const midX = canvas.width * 0.5;
+            const headY = canvas.height * (0.25 - walkProgression * 0.1) + bobbing;
+            const hipY = headY + 70 * bodyScale;
+            const leftKneeY = hipY + 50 * bodyScale + Math.sin(elapsed * 2 * Math.PI * 1.8) * 12;
+            const rightKneeY = hipY + 50 * bodyScale - Math.sin(elapsed * 2 * Math.PI * 1.8) * 12;
+            const leftAnkleY = leftKneeY + 45 * bodyScale;
+            const rightAnkleY = rightKneeY + 45 * bodyScale;
 
-          setDetectedJoints(joints);
+            const joints = [
+              { x: midX, y: headY, name: 'nose' },
+              { x: midX - 25 * bodyScale, y: hipY, name: 'left_hip' },
+              { x: midX + 25 * bodyScale, y: hipY, name: 'right_hip' },
+              { x: midX - 22 * bodyScale, y: leftKneeY, name: 'left_knee' },
+              { x: midX + 22 * bodyScale, y: rightKneeY, name: 'right_knee' },
+              { x: midX - 20 * bodyScale, y: leftAnkleY, name: 'left_ankle' },
+              { x: midX + 20 * bodyScale, y: rightAnkleY, name: 'right_ankle' }
+            ];
 
-          // Draw skeleton overlays
-          ctx.strokeStyle = '#22C55E';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(joints[1].x, joints[1].y);
-          ctx.lineTo(joints[3].x, joints[3].y);
-          ctx.lineTo(joints[5].x, joints[5].y);
-          ctx.stroke();
+            if (isMountedRef.current) {
+              setDetectedJoints(joints);
+            }
 
-          ctx.beginPath();
-          ctx.moveTo(joints[2].x, joints[2].y);
-          ctx.lineTo(joints[4].x, joints[4].y);
-          ctx.lineTo(joints[6].x, joints[6].y);
-          ctx.stroke();
-
-          // Joint circles
-          joints.forEach(j => {
-            ctx.fillStyle = '#15803D';
+            // Draw skeleton overlays
+            ctx.strokeStyle = '#22C55E';
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.arc(j.x, j.y, 4, 0, 2 * Math.PI);
-            ctx.fill();
-          });
+            ctx.moveTo(joints[1].x, joints[1].y);
+            ctx.lineTo(joints[3].x, joints[3].y);
+            ctx.lineTo(joints[5].x, joints[5].y);
+            ctx.stroke();
 
-          const landmarkMap: Record<string, { x: number; y: number; z: number; visibility: number; name: string }> = {};
-          joints.forEach(j => {
-            landmarkMap[j.name.toUpperCase()] = {
-              name: j.name.toUpperCase(),
-              x: j.x / canvas.width,
-              y: j.y / canvas.height,
-              z: 0,
-              visibility: 0.95
-            };
-          });
+            ctx.beginPath();
+            ctx.moveTo(joints[2].x, joints[2].y);
+            ctx.lineTo(joints[4].x, joints[4].y);
+            ctx.lineTo(joints[6].x, joints[6].y);
+            ctx.stroke();
 
-          frameLandmarksRef.current.push({
-            timestampMs: Date.now(),
-            landmarks: landmarkMap
-          });
-          setFramesCollected(frameLandmarksRef.current.length);
+            // Joint circles
+            joints.forEach(j => {
+              ctx.fillStyle = '#15803D';
+              ctx.beginPath();
+              ctx.arc(j.x, j.y, 4, 0, 2 * Math.PI);
+              ctx.fill();
+            });
+
+            const landmarkMap: Record<string, { x: number; y: number; z: number; visibility: number; name: string }> = {};
+            joints.forEach(j => {
+              landmarkMap[j.name.toUpperCase()] = {
+                name: j.name.toUpperCase(),
+                x: j.x / canvas.width,
+                y: j.y / canvas.height,
+                z: 0,
+                visibility: 0.95
+              };
+            });
+
+            frameLandmarksRef.current.push({
+              timestampMs: Date.now(),
+              landmarks: landmarkMap
+            });
+            if (isMountedRef.current) {
+              setFramesCollected(frameLandmarksRef.current.length);
+            }
+          }
         }
+      } catch (err) {
+        console.warn('Frame extraction warning:', err);
       }
-      animFrameRef.current = requestAnimationFrame(runFrameExtraction);
+
+      if (isMountedRef.current && isTestingRef.current) {
+        animFrameRef.current = requestAnimationFrame(runFrameExtraction);
+      }
     };
 
     runFrameExtraction();
 
     timerRef.current = setInterval(() => {
+      if (!isMountedRef.current || !isTestingRef.current) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        return;
+      }
       duration--;
       setCameraSecondsLeft(duration);
       if (duration <= 0) {
         clearInterval(timerRef.current);
-        if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        timerRef.current = null;
+        if (animFrameRef.current) {
+          cancelAnimationFrame(animFrameRef.current);
+          animFrameRef.current = null;
+        }
         finishCameraGait();
       }
     }, 1000);
   };
 
   const finishCameraGait = async () => {
+    if (hasFinishedRef.current) return;
+    hasFinishedRef.current = true;
+    isTestingRef.current = false;
+
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
     stopCameraStream();
+
+    if (!isMountedRef.current) return;
+
+    // Validate frames before API call
+    const frames = frameLandmarksRef.current || [];
+    const validFrames = frames.filter(f => f && f.landmarks && typeof f.landmarks === 'object');
+
+    if (validFrames.length < 5) {
+      setProcessingState('error');
+      setErrorMessage("We couldn't reliably capture the walking sequence. Please retry with your full body visible and good lighting.");
+      return;
+    }
+
     setProcessingState('processing');
     try {
       const response = await measurementApi.submitCameraGait({
         mode: activeMode,
-        frames: frameLandmarksRef.current,
+        frames: validFrames,
         durationSeconds: 6.0,
         fps: 30,
         simulatedScenario: currentScenario as DemoScenario
       });
 
-      const result = response.result || response.gaitCamera;
+      if (!isMountedRef.current) return;
+
+      const result = response?.result || response?.gaitCamera;
+      if (!result) {
+        throw new Error("Invalid response format from camera gait service.");
+      }
+
       setCameraResult(result);
       setProcessingState('success');
       if (onComplete) onComplete(result);
     } catch (err: any) {
+      if (!isMountedRef.current) return;
       setProcessingState('error');
-      setErrorMessage(err.message || 'Kinematic camera gait extraction failed.');
+      setErrorMessage(err.message || "Kinematic camera gait extraction failed. Please retry.");
     }
   };
 
   // =========================================================================
-  // MOTION GAIT: Accelerometer & Gyroscope In-Pocket Workflow (Existing)
+  // MOTION GAIT: Accelerometer & Gyroscope In-Pocket Workflow
   // =========================================================================
   const startMotionTest = async () => {
+    if (isTestingRef.current) return;
+    stopAll();
+
+    isTestingRef.current = true;
     setErrorMessage('');
     setMotionResult(null);
     motionBufferRef.current = [];
@@ -333,10 +443,16 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
           mode: 'demo',
           simulatedScenario: currentScenario as DemoScenario
         });
-        setMotionResult(response.gait);
+        if (!isMountedRef.current) return;
+        isTestingRef.current = false;
+        const result = response?.gait;
+        if (!result) throw new Error('Demo motion gait failed.');
+        setMotionResult(result);
         setProcessingState('success');
-        if (onComplete) onComplete(response.gait);
+        if (onComplete) onComplete(result);
       } catch (err: any) {
+        if (!isMountedRef.current) return;
+        isTestingRef.current = false;
         setProcessingState('error');
         setErrorMessage(err.message || 'Demo gait analysis failed.');
       }
@@ -346,37 +462,55 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
     setProcessingState('recording');
 
     if (sensorRef.current) {
-      const { isSimulated } = await sensorRef.current.start();
-      setIsSimulatedSensor(isSimulated);
+      try {
+        const { isSimulated } = await sensorRef.current.start();
+        if (isMountedRef.current) setIsSimulatedSensor(isSimulated);
 
-      sensorRef.current.onMotion = reading => {
-        motionBufferRef.current.push(reading);
-        const mag = Math.sqrt(reading.x * reading.x + reading.y * reading.y + reading.z * reading.z);
+        sensorRef.current.onMotion = reading => {
+          if (!isMountedRef.current || !isTestingRef.current) return;
+          motionBufferRef.current.push(reading);
+          const mag = Math.sqrt(reading.x * reading.x + reading.y * reading.y + reading.z * reading.z);
 
-        setLiveAccelMag(prev => {
-          const next = [...prev, mag];
-          return next.slice(-40);
-        });
+          setLiveAccelMag(prev => {
+            const next = [...prev, mag];
+            return next.slice(-40);
+          });
 
-        if (mag > 11.2 && motionBufferRef.current.length % 6 === 0) {
-          setMotionStepCount(c => c + 1);
-        }
-      };
+          if (mag > 11.2 && motionBufferRef.current.length % 6 === 0) {
+            setMotionStepCount(c => c + 1);
+          }
+        };
+      } catch (e) {
+        console.warn('Motion sensor error:', e);
+      }
     }
 
     let left = 30;
     timerRef.current = setInterval(() => {
+      if (!isMountedRef.current || !isTestingRef.current) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        return;
+      }
       left--;
       setMotionSecondsLeft(left);
       if (left <= 0) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
         finishMotionTest();
       }
     }, 1000);
   };
 
   const finishMotionTest = async () => {
-    if (sensorRef.current) sensorRef.current.stop();
+    isTestingRef.current = false;
+    if (sensorRef.current) {
+      try {
+        sensorRef.current.stop();
+      } catch (_) {}
+    }
+
+    if (!isMountedRef.current) return;
+
     setProcessingState('processing');
 
     try {
@@ -385,12 +519,27 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
         readings: motionBufferRef.current,
         simulatedScenario: currentScenario as DemoScenario
       });
-      setMotionResult(response.gait);
+      if (!isMountedRef.current) return;
+
+      const result = response?.gait;
+      if (!result) throw new Error('Unable to compute motion gait metrics.');
+      setMotionResult(result);
       setProcessingState('success');
-      if (onComplete) onComplete(response.gait);
+      if (onComplete) onComplete(result);
     } catch (err: any) {
+      if (!isMountedRef.current) return;
       setProcessingState('error');
       setErrorMessage(err.message || 'Unable to compute motion gait metrics.');
+    }
+  };
+
+  const handleResetCamera = () => {
+    stopAll();
+    setProcessingState('idle');
+    setCameraResult(null);
+    setErrorMessage('');
+    if (gaitModality === 'camera') {
+      initCameraPreview();
     }
   };
 
@@ -444,6 +593,7 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
         <button
           onClick={() => {
             if (processingState === 'idle') {
+              stopAll();
               setGaitModality('camera');
               setCameraResult(null);
             }
@@ -462,6 +612,7 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
         <button
           onClick={() => {
             if (processingState === 'idle') {
+              stopAll();
               setGaitModality('motion');
               setMotionResult(null);
             }
@@ -583,7 +734,7 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
                 </div>
               </div>
               <button
-                onClick={startCameraGaitTest}
+                onClick={handleResetCamera}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#15803D] py-3 text-xs font-bold text-white shadow hover:bg-[#166534]"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -667,10 +818,7 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
               </div>
 
               <button
-                onClick={() => {
-                  setProcessingState('idle');
-                  setCameraResult(null);
-                }}
+                onClick={handleResetCamera}
                 className="w-full rounded-xl bg-gray-200 py-2.5 text-xs font-bold text-gray-800 hover:bg-gray-300"
               >
                 Perform Another Walk
