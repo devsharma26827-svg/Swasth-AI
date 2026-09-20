@@ -224,8 +224,8 @@ export default function App() {
 
       <ProfileSetupModal
         isOpen={showProfileSetup}
-        profile={profile}
-        onSave={handleProfileSetupComplete}
+        initialProfile={profile}
+        onComplete={handleProfileSetupComplete}
       />
 
       <AuthModal

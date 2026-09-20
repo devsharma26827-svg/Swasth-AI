@@ -26,7 +26,7 @@ import {
 
 const BASE_URL = '';
 
-let currentAuthToken = localStorage.getItem('swasthai_token') || 'jwt_mock_token_dev_2026_valid';
+let currentAuthToken = localStorage.getItem('swasthai_token') || '';
 
 export function setAuthToken(token: string | null) {
   if (token) {

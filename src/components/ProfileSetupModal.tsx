@@ -32,12 +32,12 @@ export const ProfileSetupModal: React.FC<Props> = ({
 
   // Form State
   const [name, setName] = useState(initialProfile?.name && initialProfile.name !== 'Patient User' ? initialProfile.name : '');
-  const [age, setAge] = useState<string>(initialProfile?.age ? String(initialProfile.age) : '28');
+  const [age, setAge] = useState<string>(initialProfile?.age ? String(initialProfile.age) : '');
   const [sex, setSex] = useState<'male' | 'female' | 'other' | 'prefer_not_to_say'>(
     initialProfile?.sex || 'prefer_not_to_say'
   );
-  const [height, setHeight] = useState<string>(initialProfile?.height ? String(initialProfile.height) : '172');
-  const [weight, setWeight] = useState<string>(initialProfile?.weight ? String(initialProfile.weight) : '68');
+  const [height, setHeight] = useState<string>(initialProfile?.height ? String(initialProfile.height) : '');
+  const [weight, setWeight] = useState<string>(initialProfile?.weight ? String(initialProfile.weight) : '');
 
   // Optional info
   const [conditions, setConditions] = useState(initialProfile?.existingConditions?.join(', ') || '');

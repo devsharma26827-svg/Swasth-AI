@@ -31,6 +31,7 @@ import {
   verifyJwtToken
 } from './rbac';
 import { HealthRiskEngine, SignalReading } from './risk_engine';
+import { jsonStore } from './json_store';
 
 export interface UserAccount {
   id: string; // Unique immutable UUID
@@ -853,6 +854,10 @@ export class HealthDataStore {
       email: user.email, // Preserve email
       updatedAt: new Date().toISOString()
     };
+
+    try {
+      jsonStore.update('profiles', (p: any) => p.id === userId, user.profile);
+    } catch (_) {}
 
     return user.profile;
   }
