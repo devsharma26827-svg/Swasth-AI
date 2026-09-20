@@ -821,7 +821,58 @@ export class HealthDataStore {
   }
 
   public getUserById(userId: string): UserAccount | null {
-    return this.users.get(userId) || null;
+    if (!userId) return null;
+    let cached = this.users.get(userId);
+    if (cached) return cached;
+
+    try {
+      const profile = jsonStore.findOne<UserProfile>('profiles', p => p.id === userId);
+      const userRec = jsonStore.findOne<any>('users', u => u.id === userId);
+
+      if (profile || userRec) {
+        const now = new Date().toISOString();
+        const account: UserAccount = {
+          id: userId,
+          email: profile?.email || userRec?.email || '',
+          passwordHash: userRec?.passwordHash || '',
+          role: profile?.role || userRec?.role || 'USER',
+          permissions: getPermissionsForRole(profile?.role || userRec?.role || 'USER'),
+          createdAt: profile?.createdAt || now,
+          updatedAt: profile?.updatedAt || now,
+          lastActivity: now,
+          profile: profile || {
+            id: userId,
+            name: userRec?.name || 'Patient User',
+            email: userRec?.email || '',
+            role: 'USER',
+            age: 30,
+            sex: 'male',
+            height: 170,
+            weight: 70,
+            existingConditions: [],
+            medications: '',
+            createdAt: now,
+            updatedAt: now,
+            profileCompleted: true
+          },
+          checkups: [],
+          ppgHistory: [],
+          heartSoundHistory: [],
+          coughHistory: [],
+          gaitMotionHistory: [],
+          gaitCameraHistory: [],
+          bmiHistory: [],
+          reports: [],
+          appointments: [],
+          labBookings: [],
+          consentLogs: []
+        };
+        this.users.set(userId, account);
+        return account;
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   // ==========================================
@@ -1137,7 +1188,7 @@ export class HealthDataStore {
 
   public getPersonalizedRiskSummary(userId: string): RiskSummary {
     const user = this.getUserById(userId);
-    if (!user) throw new Error('User not found');
+    const profile = user?.profile;
 
     const currentCheckup = this.getCurrentCheckup(userId);
     const readings: SignalReading[] = [];

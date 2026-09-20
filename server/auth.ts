@@ -127,23 +127,24 @@ export function registerUser(payload: {
 
   jsonStore.insert<UserRecord>(USERS_COLLECTION, userRecord);
 
-  // Initialize brand-new UserProfile with ZERO seeded measurements
+  const hasFullDemographics = Boolean(payload.age && payload.height && payload.weight);
+
   const profileRecord: UserProfile = {
     id: userId,
     name,
     email,
     role,
-    age: payload.age || 30,
-    sex: (payload.sex as any) || 'male',
-    height: payload.height || 170,
-    weight: payload.weight || 70,
+    age: payload.age ? Number(payload.age) : 0,
+    sex: (payload.sex as any) || 'prefer_not_to_say',
+    height: payload.height ? Number(payload.height) : 0,
+    weight: payload.weight ? Number(payload.weight) : 0,
     existingConditions: [],
     medications: '',
     activityLevel: 'moderately_active',
     smokingStatus: 'non_smoker',
     createdAt: now,
     updatedAt: now,
-    profileCompleted: true
+    profileCompleted: hasFullDemographics
   };
 
   jsonStore.insert<UserProfile>(PROFILES_COLLECTION, profileRecord);

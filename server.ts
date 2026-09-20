@@ -968,18 +968,23 @@ async function startServer() {
     console.warn('[SwasthAI ML] HeartSoundCNN warm-up warning:', err.message);
   });
 
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  } else {
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    !!process.env.RENDER ||
+    fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'));
+
+  if (isProduction) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
+  } else {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
   }
 
   app.listen(PORT, '0.0.0.0', () => {

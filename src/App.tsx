@@ -166,14 +166,13 @@ export default function App() {
           <>
             {currentTab === 'home' && (
               <HomeScreen
+                profile={profile}
+                riskSummary={riskSummary}
                 onStartCheckup={() => setCurrentTab('checkup')}
-                onViewTrends={() => setCurrentTab('trends')}
-                onViewReports={() => setCurrentTab('reports')}
+                onNavigateTab={(tab) => setCurrentTab(tab)}
                 onOpenDoctorConsult={() => setActiveSubView('doctor_consult')}
                 onOpenLabBooking={() => setActiveSubView('lab_booking')}
                 onOpenFollowUp={() => setActiveSubView('follow_up')}
-                riskSummary={riskSummary}
-                userProfile={profile}
               />
             )}
 
