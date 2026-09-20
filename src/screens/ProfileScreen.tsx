@@ -252,7 +252,7 @@ export const ProfileScreen: React.FC<Props> = ({
         </div>
 
         <p className="text-xs text-gray-500">
-          Switch test scenarios to evaluate how SwasthAI's heuristic risk engine and clinician recommendations react to various physiological states.
+          Switch test scenarios to evaluate how SwasthSense's heuristic risk engine and clinician recommendations react to various physiological states.
         </p>
 
         <div className="space-y-2">

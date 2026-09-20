@@ -118,10 +118,10 @@ export default function App() {
   // If initial load in progress
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAF9F6] text-center p-4">
+      <div className="flex min-h-screen min-h-[100dvh] w-full flex-col items-center justify-center bg-[#FAF9F6] text-center p-4">
         <div className="h-10 w-10 animate-spin rounded-full border-3 border-[#15803D] border-t-transparent mb-3" />
         <h2 className="text-sm font-bold text-gray-800">Verifying session...</h2>
-        <p className="text-xs text-gray-500 mt-1">Connecting to secure SwasthAI authentication engine</p>
+        <p className="text-xs text-gray-500 mt-1">Connecting to secure SwasthSense authentication engine</p>
       </div>
     );
   }
@@ -132,7 +132,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#1F2421] font-sans antialiased selection:bg-[#E8F5E9]">
+    <div className="min-h-screen min-h-[100dvh] w-full bg-[#FAF9F6] text-[#1F2421] font-sans antialiased selection:bg-[#E8F5E9] flex flex-col">
       {/* Top Application Bar */}
       <Header
         onOpenEmergency={() => setIsEmergencyModalOpen(true)}
@@ -143,7 +143,7 @@ export default function App() {
       />
 
       {/* Main View Router */}
-      <main className="mx-auto max-w-lg">
+      <main className="w-full flex-1 md:max-w-lg md:mx-auto pb-20">
         {/* SUBVIEWS (OVERLAYS) */}
         {activeSubView === 'doctor_consult' && (
           <DoctorConsultScreen onBack={() => setActiveSubView('none')} />

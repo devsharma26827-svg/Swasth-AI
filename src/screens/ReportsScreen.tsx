@@ -65,7 +65,7 @@ export const ReportsScreen: React.FC<Props> = ({ onBack }) => {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      doc.text('SwasthAI - Personal Health Screening Report', 14, 15);
+      doc.text('SwasthSense - Personal Health Screening Report', 14, 15);
 
       // Metadata
       doc.setTextColor(darkText[0], darkText[1], darkText[2]);
@@ -215,7 +215,7 @@ export const ReportsScreen: React.FC<Props> = ({ onBack }) => {
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#15803D] text-white">
                 <FileText className="h-4 w-4" />
               </div>
-              <span className="text-sm font-black text-[#1F2421]">SwasthAI Health Report</span>
+              <span className="text-sm font-black text-[#1F2421]">SwasthSense Health Report</span>
             </div>
             <span
               className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${

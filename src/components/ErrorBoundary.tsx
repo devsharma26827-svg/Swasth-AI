@@ -51,7 +51,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             <div className="space-y-1">
               <h1 className="text-xl font-bold text-gray-900">Something went wrong</h1>
               <p className="text-xs text-gray-500">
-                SwasthAI encountered an unexpected application runtime condition.
+                SwasthSense encountered an unexpected application runtime condition.
               </p>
             </div>
 

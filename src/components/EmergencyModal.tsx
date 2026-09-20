@@ -48,7 +48,7 @@ export const EmergencyModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <div>
                 <h4 className="text-sm font-bold text-red-900">Do not wait for AI analysis</h4>
                 <p className="mt-1 text-xs text-red-800 leading-relaxed">
-                  SwasthAI is strictly for routine monitoring and screening. If you or someone nearby is experiencing acute symptoms, seek immediate professional emergency medical care.
+                  SwasthSense is strictly for routine monitoring and screening. If you or someone nearby is experiencing acute symptoms, seek immediate professional emergency medical care.
                 </p>
               </div>
             </div>

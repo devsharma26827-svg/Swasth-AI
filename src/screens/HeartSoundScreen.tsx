@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Volume2, RefreshCw, CheckCircle2, AlertCircle, Info, ArrowLeft, Disc } from 'lucide-react';
+import { Mic, RefreshCw, CheckCircle2, AlertCircle, Info, ArrowLeft } from 'lucide-react';
 import { MicrophoneAudioSensor } from '../services/sensors';
 import { measurementApi } from '../services/api';
 import { HeartSoundResult, DemoScenario } from '../types';
@@ -10,9 +10,11 @@ interface Props {
   currentScenario?: DemoScenario;
 }
 
+const TARGET_DURATION = 25;
+
 export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentScenario = 'normal' }) => {
   const [isRecording, setIsRecording] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(25);
+  const [secondsLeft, setSecondsLeft] = useState(TARGET_DURATION);
   const [volumeRms, setVolumeRms] = useState(0);
   const [frequencyBars, setFrequencyBars] = useState<number[]>([]);
   const [processingState, setProcessingState] = useState<'idle' | 'recording' | 'processing' | 'success' | 'error'>('idle');
@@ -22,6 +24,7 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
   const sensorRef = useRef<MicrophoneAudioSensor | null>(null);
   const samplesBufferRef = useRef<number[]>([]);
   const timerRef = useRef<any>(null);
+  const startTimeRef = useRef<number | null>(null);
 
   const [activeMode, setActiveMode] = useState<'real' | 'demo'>('real');
 
@@ -36,7 +39,7 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
     setErrorMessage('');
     setResult(null);
     samplesBufferRef.current = [];
-    setSecondsLeft(10);
+    setSecondsLeft(TARGET_DURATION);
 
     if (activeMode === 'demo') {
       setProcessingState('processing');
@@ -75,18 +78,23 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
       }
     }
 
+    startTimeRef.current = Date.now();
     setProcessingState('recording');
     setIsRecording(true);
 
-    let left = 10;
+    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      left--;
-      setSecondsLeft(left);
-      if (left <= 0) {
-        clearInterval(timerRef.current);
+      if (!startTimeRef.current) return;
+      const elapsedMs = Date.now() - startTimeRef.current;
+      const recordedSec = Math.min(TARGET_DURATION, Math.floor(elapsedMs / 1000));
+      const remaining = Math.max(0, TARGET_DURATION - recordedSec);
+      setSecondsLeft(remaining);
+
+      if (recordedSec >= TARGET_DURATION) {
+        if (timerRef.current) clearInterval(timerRef.current);
         finishAndAnalyze();
       }
-    }, 1000);
+    }, 100);
   };
 
   const stopRecording = () => {
@@ -102,7 +110,7 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
     // Check minimum recording length if in real mode (minimum 3 seconds)
     if (activeMode === 'real' && resampled.samples.length < resampled.sampleRate * 3) {
       setProcessingState('error');
-      setErrorMessage('Audio recording was too short (under 3 seconds). Please record for 10 seconds.');
+      setErrorMessage('Audio recording was too short (under 3 seconds). Please record for 25 seconds.');
       return;
     }
 
@@ -123,6 +131,8 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
       setErrorMessage(err.message || 'Unable to analyze heart sound recording. Please retry in a silent room.');
     }
   };
+
+  const recordedSec = Math.min(TARGET_DURATION, TARGET_DURATION - secondsLeft);
 
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4 pb-20 animate-fade-in">
@@ -202,7 +212,7 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
                 <p className="text-[11px] text-purple-200 mt-1">Listening to acoustic chest vibrations...</p>
               </div>
             ) : (
-              <span className="text-xs text-gray-400 font-medium">Ready to record</span>
+              <span className="text-xs text-gray-400 font-medium">Ready to record (25s)</span>
             )}
           </div>
 
@@ -238,12 +248,12 @@ export const HeartSoundScreen: React.FC<Props> = ({ onComplete, onBack, currentS
 
           {processingState === 'recording' && (
             <div className="flex gap-2">
-              {secondsLeft <= 20 && (
+              {recordedSec >= 3 && (
                 <button
                   onClick={finishAndAnalyze}
                   className="flex-1 rounded-2xl bg-[#15803D] py-3 text-xs font-bold text-white shadow hover:bg-[#166534] transition-all"
                 >
-                  Finish & Analyze Now ({25 - secondsLeft}s recorded)
+                  Finish & Analyze Now ({recordedSec}s recorded)
                 </button>
               )}
               <button

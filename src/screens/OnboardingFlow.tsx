@@ -147,7 +147,7 @@ export const OnboardingFlow: React.FC<Props> = ({ onComplete }) => {
               <HeartHandshake className="h-8 w-8" />
             </div>
             <div>
-              <h2 className="text-2xl font-extrabold text-[#1F2421]">Welcome to SwasthAI</h2>
+              <h2 className="text-2xl font-extrabold text-[#1F2421]">Welcome to SwasthSense</h2>
               <p className="mt-2 text-sm text-[#5C645D] leading-relaxed">
                 Understand your health trends from your everyday smartphone. Routine checkups without clinical friction.
               </p>
@@ -292,7 +292,7 @@ export const OnboardingFlow: React.FC<Props> = ({ onComplete }) => {
               <p className="font-bold text-amber-900">Important Medical Boundaries:</p>
               <ul className="list-disc pl-4 space-y-1 text-amber-900/90">
                 <li>
-                  <strong>SwasthAI is not a doctor.</strong> The application provides monitoring measurements and first-pass screening patterns only.
+                  <strong>SwasthSense is not a doctor.</strong> The application provides monitoring measurements and first-pass screening patterns only.
                 </li>
                 <li>
                   <strong>Not a clinical diagnosis:</strong> Smartphone sensor algorithms do not substitute for certified clinical evaluations or laboratory diagnostic tests.
@@ -314,7 +314,7 @@ export const OnboardingFlow: React.FC<Props> = ({ onComplete }) => {
                 className="mt-1 h-4 w-4 rounded-sm border-gray-300 text-[#15803D] focus:ring-[#15803D]"
               />
               <span className="text-xs font-medium text-gray-700 leading-snug">
-                I understand that SwasthAI provides screening indicators, not medical diagnosis, and I agree to use it as a personal tracking assistant.
+                I understand that SwasthSense provides screening indicators, not medical diagnosis, and I agree to use it as a personal tracking assistant.
               </span>
             </label>
 

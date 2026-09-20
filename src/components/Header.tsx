@@ -34,13 +34,13 @@ export const Header: React.FC<Props> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-base font-extrabold tracking-tight text-[#1F2421]">SwasthAI</span>
+              <span className="text-base font-extrabold tracking-tight text-[#1F2421]">SwasthSense</span>
               <span className="rounded-full bg-[#E8F5E9] px-2 py-0.5 text-[10px] font-semibold text-[#166534] border border-[#C8E6C9]">
                 Patient Portal
               </span>
             </div>
-            <p className="hidden text-[11px] text-[#5C645D] sm:block">
-              Your Smart Health Checkup Assistant
+            <p className="text-[11px] text-[#5C645D]">
+              Your Smart Health Checking Assistant
             </p>
           </div>
         </div>
