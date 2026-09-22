@@ -32,6 +32,7 @@ import {
 } from './rbac';
 import { HealthRiskEngine, SignalReading } from './risk_engine';
 import { jsonStore } from './json_store';
+import { formatReportConfidence } from '../src/utils/confidence';
 
 export interface UserAccount {
   id: string; // Unique immutable UUID
@@ -1517,16 +1518,43 @@ export class HealthDataStore {
     const overallStatus = riskSummary.overallStatus;
 
     const summaryParts: string[] = [];
-    if (sessionPPG) summaryParts.push(`Cardiovascular PPG: Resting HR ${sessionPPG.heartRate} BPM (${sessionPPG.status}).`);
-    if (sessionHS) summaryParts.push(`Heart Sound auscultation: ${sessionHS.heartSoundPattern || sessionHS.patternType.replace(/_/g, ' ')} (${sessionHS.status}).`);
-    if (sessionCough) summaryParts.push(`Respiratory cough: ${sessionCough.coughPattern || sessionCough.patternType.replace(/_/g, ' ')} (${sessionCough.status}).`);
-    if (sessionGait) summaryParts.push(`Motion gait cadence: ${sessionGait.cadence} SPM (${sessionGait.status}).`);
-    if (sessionCameraGait) summaryParts.push(`Camera gait kinematics: ${sessionCameraGait.cadenceStepsPerMin} SPM (${sessionCameraGait.status}).`);
-    if (sessionBMI) summaryParts.push(`BMI evaluation: ${sessionBMI.bmi} (${sessionBMI.category}).`);
+    if (sessionPPG) {
+      const spo2Val = sessionPPG.estimatedSpO2;
+      summaryParts.push(`Cardiovascular PPG: Resting HR ${sessionPPG.heartRate} BPM, HRV ${sessionPPG.hrvRmssd} ms, Est. SpO₂ ${spo2Val}%.`);
+    }
+    if (sessionHS) {
+      summaryParts.push(`Heart Sound auscultation: ${sessionHS.heartSoundPattern || sessionHS.patternType.replace(/_/g, ' ')} (${sessionHS.status}).`);
+    }
+    if (sessionCough) {
+      summaryParts.push(`Respiratory cough screening: ${sessionCough.coughPattern || sessionCough.patternType.replace(/_/g, ' ')} (${sessionCough.status}).`);
+    }
+    if (sessionGait) {
+      summaryParts.push(`Motion gait: Cadence ${sessionGait.cadence} SPM (${sessionGait.status}).`);
+    }
+    if (sessionCameraGait) {
+      summaryParts.push(`Camera gait kinematics: Cadence ${sessionCameraGait.cadenceStepsPerMin} SPM, Symmetry ${sessionCameraGait.stepSymmetryIndex}% (${sessionCameraGait.status}).`);
+    }
+    if (sessionBMI) {
+      summaryParts.push(`BMI evaluation: ${sessionBMI.bmi} (${sessionBMI.category}).`);
+    }
 
     const execSummary = summaryParts.length > 0
-      ? `Screening evaluation for ${user.profile.name}: ${summaryParts.join(' ')}`
+      ? `Screening evaluation completed across ${testedCount} module(s) for ${user.profile.name}. ${summaryParts.join(' ')}`
       : (checkup?.summaryExplanation || 'Biomarker screening completed.');
+
+    const calculatedConfidence = formatReportConfidence(
+      riskSummary.confidence === 'high' ? 0.88 : riskSummary.confidence === 'moderate' ? 0.82 : 0.76
+    );
+
+    const actionItemsList = generateReportActionItems(
+      overallStatus,
+      sessionPPG,
+      sessionHS,
+      sessionCough,
+      sessionGait,
+      sessionCameraGait,
+      sessionBMI
+    );
 
     const report: HealthReport = {
       id: reportId,
@@ -1565,7 +1593,7 @@ export class HealthDataStore {
       sex: user.profile.sex,
       createdAt: now,
       overallStatus,
-      confidenceScore: riskSummary.confidence === 'high' ? 0.92 : riskSummary.confidence === 'moderate' ? 0.75 : 0.5,
+      confidenceScore: calculatedConfidence,
       executiveSummary: execSummary,
       disclaimer: 'SwasthSense is a smart health screening platform. It does not replace professional clinical evaluation.',
       vitals: {
@@ -1586,9 +1614,7 @@ export class HealthDataStore {
         coughPattern: sessionCough?.coughPattern || null,
         coughStatus: sessionCough?.status || 'not_tested'
       },
-      actionItems: overallStatus === 'follow_up'
-        ? ['Consult a licensed physician for clinical validation', 'Monitor symptoms daily', 'Avoid strenuous exertion']
-        : ['Maintain regular physical hydration', 'Repeat routine checkup in 7 days']
+      actionItems: actionItemsList
     };
 
     user.reports.push(report);
@@ -2017,3 +2043,80 @@ export class HealthDataStore {
 }
 
 export const dataStore = new HealthDataStore();
+
+export function generateReportActionItems(
+  overallStatus: HealthStatus,
+  sessionPPG: PPGMeasurementResult | null,
+  sessionHS: HeartSoundResult | null,
+  sessionCough: CoughResult | null,
+  sessionGait: GaitResult | null,
+  sessionCameraGait: CameraGaitResult | null,
+  sessionBMI: BMIResult | null
+): string[] {
+  const ppgAbnormal = !!sessionPPG && (sessionPPG.status === 'monitor' || sessionPPG.status === 'follow_up');
+  const spo2Abnormal = !!sessionPPG && (sessionPPG.estimatedSpO2 < 94 || sessionPPG.status === 'follow_up');
+  const hsAbnormal = !!sessionHS && (sessionHS.status === 'monitor' || sessionHS.status === 'follow_up');
+  const coughAbnormal = !!sessionCough && (sessionCough.status === 'monitor' || sessionCough.status === 'follow_up');
+  const gaitAbnormal = (!!sessionGait && (sessionGait.status === 'monitor' || sessionGait.status === 'follow_up')) ||
+                       (!!sessionCameraGait && (sessionCameraGait.status === 'monitor' || sessionCameraGait.status === 'follow_up'));
+  const bmiAbnormal = !!sessionBMI && (sessionBMI.status === 'monitor' || sessionBMI.status === 'follow_up' || sessionBMI.category !== 'Normal weight');
+
+  const hasAnyAbnormal = ppgAbnormal || spo2Abnormal || hsAbnormal || coughAbnormal || gaitAbnormal || bmiAbnormal || overallStatus !== 'normal';
+
+  if (!hasAnyAbnormal) {
+    return [
+      'Maintain adequate daily physical hydration (2.0–2.5L water) and balanced nutrition.',
+      'Continue regular daily physical activity (e.g. 30 minutes walking) appropriate for your routine.',
+      'Maintain consistent sleep and recovery habits (7–8 hours nightly) to support autonomic recovery.',
+      'Repeat routine smartphone screening check-in according to your recommended weekly schedule.'
+    ];
+  }
+
+  const items: string[] = [];
+
+  if (ppgAbnormal) {
+    items.push('Re-check resting heart rate under calm conditions after 5 minutes of rest.');
+    items.push('Monitor resting pulse and HRV trends across repeated screenings rather than relying on a single reading.');
+    items.push('Consider consultation with a General Physician or Cardiologist if heart rate elevation or irregularity persists.');
+  }
+
+  if (spo2Abnormal) {
+    items.push('Repeat SpO₂ optical screening under good ambient lighting and verify steady finger placement on camera lens.');
+    items.push('Practice relaxed diaphragmatic breathing and ensure proper room ventilation.');
+    items.push('Consider consultation with a General Physician or Pulmonologist if low oxygen saturation estimates (<94%) persist.');
+  }
+
+  if (hsAbnormal) {
+    items.push('Repeat acoustic heart-sound screening in a quiet environment free from ambient background noise.');
+    items.push('Review persistent abnormal acoustic heart-sound patterns with a General Physician.');
+    items.push('Consider Cardiologist consultation if abnormal acoustic rhythm indicators persist across sessions.');
+  }
+
+  if (coughAbnormal) {
+    items.push('Repeat cough screening under clear microphone recording conditions.');
+    items.push('Maintain hydration and routine respiratory hygiene practices.');
+    items.push('Consider discussing persistent cough or respiratory findings with a General Physician or Pulmonologist.');
+  }
+
+  if (gaitAbnormal) {
+    items.push('Repeat gait kinematics screening under safe walking conditions on a flat, well-lit surface.');
+    items.push('Continue gentle mobility and walking exercises aligned with your physical comfort.');
+    items.push('Review persistent gait asymmetry or cadence variances with a healthcare professional.');
+  }
+
+  if (bmiAbnormal) {
+    items.push('Review weight and physical activity trends over time rather than relying on a single measurement.');
+    items.push('Maintain balanced nutrition and regular physical exercise.');
+    items.push('Consider discussing long-term weight management with a General Physician or qualified nutrition professional.');
+  }
+
+  if (items.length === 0) {
+    items.push('Re-check screening vitals under calm conditions after 5 minutes of rest.');
+    items.push('Track signal trends across repeated sessions over the next 7 days.');
+    items.push('Consider discussing persistent physiological variances with a General Physician.');
+    items.push('Seek immediate medical attention if you experience severe symptoms such as chest pain or breathlessness.');
+  }
+
+  const uniqueItems = Array.from(new Set(items));
+  return uniqueItems.slice(0, 6);
+}

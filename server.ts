@@ -285,7 +285,7 @@ app.post(['/api/measurements/ppg', '/measurements/ppg'], authenticateUser, (req:
 
     const baseBpm = simulatedScenario === 'follow_up' ? 104 : simulatedScenario === 'monitor' ? 88 : 72;
     const baseHrv = simulatedScenario === 'follow_up' ? 18 : simulatedScenario === 'monitor' ? 28 : 42;
-    const baseSpo2 = simulatedScenario === 'follow_up' ? 94 : simulatedScenario === 'monitor' ? 96 : 98;
+    const baseSpo2 = simulatedScenario === 'follow_up' ? 92 : simulatedScenario === 'monitor' ? 95 : 98;
     const waveSamples: number[] = [];
 
     for (let i = 0; i < 30; i++) {

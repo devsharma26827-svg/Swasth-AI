@@ -301,7 +301,7 @@ export class PPGSignalProcessor {
 
     // Empirical calibration curve polynomial approximation: 110 - 25 * R
     let spo2 = Math.round(108 - 14 * ratioOfRatios);
-    spo2 = Math.min(99, Math.max(92, spo2));
+    spo2 = Math.min(99, Math.max(85, spo2));
 
     return { estimatedSpO2: spo2, ratio: Number(ratioOfRatios.toFixed(3)) };
   }
@@ -322,8 +322,8 @@ export class PPGSignalProcessor {
     const hrv = hrHrv.success ? hrHrv.hrvRmssd : 45;
 
     let status: HealthStatus = 'normal';
-    if (hr < 50 || hr > 110 || hrv < 20) {
-      status = 'monitor';
+    if (hr < 50 || hr > 110 || hrv < 20 || spo2Res.estimatedSpO2 < 94) {
+      status = (spo2Res.estimatedSpO2 < 94 || hr > 120 || hr < 40) ? 'follow_up' : 'monitor';
     }
     if (quality.score < 50) {
       status = 'insufficient';

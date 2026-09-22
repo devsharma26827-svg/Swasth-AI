@@ -243,6 +243,49 @@ async function runE2ETests() {
   assert(reportModules[2].tested === false, 'Untested Cough has tested=false');
   assert(reportModules[3].tested === false, 'Untested Gait has tested=false');
 
+  // 8. Confidence Normalization Test (Bounded to 75-90%)
+  console.log('\n--- Step 8: Confidence Score Normalization Test ---');
+  const { formatReportConfidence } = await import('../src/utils/confidence');
+  assert(formatReportConfidence(0.92) === 90, 'Internal 0.92 converts to capped 90%');
+  assert(formatReportConfidence(0.82) === 82, 'Internal 0.82 converts to 82%');
+  assert(formatReportConfidence(0.50) === 75, 'Internal 0.50 converts to minimum 75%');
+  assert(formatReportConfidence(88) === 88, 'Already percentage 88 remains 88%');
+
+  // 9. Report Action Items Engine Test - Normal Case
+  console.log('\n--- Step 9: Report Action Items Engine - Normal Checkup ---');
+  const { generateReportActionItems } = await import('./mock_store');
+  const normalActions = generateReportActionItems('normal', { heartRate: 72, hrvRmssd: 45, estimatedSpO2: 98, status: 'normal' } as any, null, null, null, null, null);
+  assert(normalActions.length >= 4, `Normal checkup generates >= 4 action items (actual: ${normalActions.length})`);
+  assert(!normalActions.some(a => a.toLowerCase().includes('consult a licensed physician') || a.toLowerCase().includes('doctor')), 'Normal report has no mandatory physician referral requirement');
+
+  // 10. Low SpO2 Action Items Test
+  console.log('\n--- Step 10: Low SpO2 Action Items Test (<94%) ---');
+  const lowSpo2Actions = generateReportActionItems('follow_up', { heartRate: 75, hrvRmssd: 40, estimatedSpO2: 91, status: 'follow_up' } as any, null, null, null, null, null);
+  assert(lowSpo2Actions.some(a => a.includes('SpO₂') || a.includes('oxygen')), 'Low SpO2 actions mention optical SpO2 / oxygen screening');
+  assert(lowSpo2Actions.some(a => a.includes('Pulmonologist') || a.includes('Physician')), 'Low SpO2 actions recommend consulting GP or Pulmonologist for persistent low readings');
+  assert(!lowSpo2Actions.some(a => a.toLowerCase().includes('lung disease') || a.toLowerCase().includes('pneumonia')), 'Low SpO2 actions do NOT diagnose lung disease');
+
+  // 11. Heart Sound Abnormal Action Items Test
+  console.log('\n--- Step 11: Heart Sound Abnormal Action Items Test ---');
+  const hsAbnormalActions = generateReportActionItems('follow_up', null, { heartSoundPattern: 'Murmur Suspected', patternType: 'murmur_suspected', status: 'follow_up' } as any, null, null, null, null);
+  assert(hsAbnormalActions.some(a => a.includes('acoustic heart-sound') || a.includes('heart-sound')), 'Heart sound actions specify acoustic heart-sound pattern');
+  assert(hsAbnormalActions.some(a => a.includes('Cardiologist') || a.includes('Physician')), 'Heart sound actions recommend GP or Cardiologist review for persistent patterns');
+  assert(!hsAbnormalActions.some(a => a.toLowerCase().includes('you have heart disease')), 'Heart sound actions do NOT diagnose heart disease');
+
+  // 12. Multi-Module Abnormal Combination & Deduplication Test
+  console.log('\n--- Step 12: Multi-Module Abnormal Combination & Deduplication Test ---');
+  const multiAbnormalActions = generateReportActionItems(
+    'follow_up',
+    { heartRate: 104, hrvRmssd: 18, estimatedSpO2: 92, status: 'follow_up' } as any,
+    { heartSoundPattern: 'Murmur Suspected', patternType: 'murmur_suspected', status: 'follow_up' } as any,
+    { coughPattern: 'WET RESONANT', patternType: 'wet_resonant', status: 'follow_up' } as any,
+    null,
+    null,
+    null
+  );
+  assert(multiAbnormalActions.length >= 4 && multiAbnormalActions.length <= 6, `Multi-module actions capped between 4 and 6 items (actual: ${multiAbnormalActions.length})`);
+  assert(new Set(multiAbnormalActions).size === multiAbnormalActions.length, 'Multi-module actions are strictly deduplicated');
+
   console.log(`\n==============================================`);
   console.log(`ALL VERIFICATION TESTS COMPLETED: ${passed} PASSED, ${failed} FAILED`);
   console.log(`==============================================`);

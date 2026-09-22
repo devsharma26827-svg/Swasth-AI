@@ -15,6 +15,7 @@ import {
 import jsPDF from 'jspdf';
 import { reportApi } from '../services/api';
 import { HealthReport } from '../types';
+import { formatReportConfidence } from '../utils/confidence';
 
 interface Props {
   onBack: () => void;
@@ -99,8 +100,9 @@ export const ReportsScreen: React.FC<Props> = ({ onBack }) => {
 
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
+      const displayConfidence = formatReportConfidence(report.confidenceScore);
       doc.text(`Overall Status: ${report.overallStatus.toUpperCase()}`, 14, 71);
-      doc.text(`Confidence Score: ${report.confidenceScore}%`, 14, 76);
+      doc.text(`Confidence Score: ${displayConfidence}%`, 14, 76);
       const splitSummary = doc.splitTextToSize(report.executiveSummary, 182);
       doc.text(splitSummary, 14, 82);
 
@@ -128,13 +130,13 @@ export const ReportsScreen: React.FC<Props> = ({ onBack }) => {
             m.tested ? (m.healthStatus ? m.healthStatus.toUpperCase() : 'NORMAL') : 'NOT TESTED'
           ])
         : [
-            ['Resting Heart Rate (PPG)', report.vitals.heartRate !== null && report.vitals.heartRate !== undefined ? `${report.vitals.heartRate} BPM` : 'Not Tested', report.vitals.heartRateStatus ? report.vitals.heartRateStatus.toUpperCase() : 'NOT_TESTED'],
-            ['Heart Rate Variability (RMSSD)', report.vitals.hrvRmssd !== null && report.vitals.hrvRmssd !== undefined ? `${report.vitals.hrvRmssd} ms` : 'Not Tested', report.vitals.hrvStatus ? report.vitals.hrvStatus.toUpperCase() : 'NOT_TESTED'],
-            ['Estimated SpO2 (Prototype Proxy)', report.vitals.estimatedSpO2 !== null && report.vitals.estimatedSpO2 !== undefined ? `~${report.vitals.estimatedSpO2}%` : 'Not Tested', report.vitals.estimatedSpO2 !== null ? 'EXPERIMENTAL' : 'NOT_TESTED'],
-            ['Weight / Body Mass Index', report.vitals.bmi !== null && report.vitals.bmi !== undefined ? `${report.vitals.weightKg} kg (BMI: ${report.vitals.bmi})` : 'Not Tested', report.vitals.bmi !== null ? 'NORMAL' : 'NOT_TESTED'],
-            ['Walking Cadence (Gait)', report.vitals.cadence !== null && report.vitals.cadence !== undefined ? `${report.vitals.cadence} steps/min` : 'Not Tested', report.vitals.gaitStatus ? report.vitals.gaitStatus.toUpperCase() : 'NOT_TESTED'],
-            ['Acoustic Heart Sound Rhythm', report.vitals.heartSoundPattern ? report.vitals.heartSoundPattern.replace(/_/g, ' ') : 'Not Tested', report.vitals.heartSoundStatus ? report.vitals.heartSoundStatus.toUpperCase() : 'NOT_TESTED'],
-            ['Acoustic Respiratory / Cough', report.vitals.coughPattern ? report.vitals.coughPattern.replace(/_/g, ' ') : 'Not Tested', report.vitals.coughStatus ? report.vitals.coughStatus.toUpperCase() : 'NOT_TESTED']
+            ['Resting Heart Rate (PPG)', report.vitals.heartRate !== null && report.vitals.heartRate !== undefined ? `${report.vitals.heartRate} BPM` : 'Not Tested', report.vitals.heartRateStatus ? report.vitals.heartRateStatus.toUpperCase() : 'NOT TESTED'],
+            ['Heart Rate Variability (RMSSD)', report.vitals.hrvRmssd !== null && report.vitals.hrvRmssd !== undefined ? `${report.vitals.hrvRmssd} ms` : 'Not Tested', report.vitals.hrvStatus ? report.vitals.hrvStatus.toUpperCase() : 'NOT TESTED'],
+            ['Estimated SpO2 (Proxy)', report.vitals.estimatedSpO2 !== null && report.vitals.estimatedSpO2 !== undefined ? `~${report.vitals.estimatedSpO2}%` : 'Not Tested', report.vitals.estimatedSpO2 !== null && report.vitals.estimatedSpO2 !== undefined ? (report.vitals.estimatedSpO2 >= 94 ? 'NORMAL' : 'FOLLOW_UP') : 'NOT TESTED'],
+            ['Weight / Body Mass Index', report.vitals.bmi !== null && report.vitals.bmi !== undefined ? `${report.vitals.weightKg} kg (BMI: ${report.vitals.bmi})` : 'Not Tested', report.vitals.bmi !== null ? 'NORMAL' : 'NOT TESTED'],
+            ['Walking Cadence (Gait)', report.vitals.cadence !== null && report.vitals.cadence !== undefined ? `${report.vitals.cadence} steps/min` : 'Not Tested', report.vitals.gaitStatus ? report.vitals.gaitStatus.toUpperCase() : 'NOT TESTED'],
+            ['Acoustic Heart Sound Rhythm', report.vitals.heartSoundPattern ? report.vitals.heartSoundPattern.replace(/_/g, ' ') : 'Not Tested', report.vitals.heartSoundStatus ? report.vitals.heartSoundStatus.toUpperCase() : 'NOT TESTED'],
+            ['Acoustic Respiratory / Cough', report.vitals.coughPattern ? report.vitals.coughPattern.replace(/_/g, ' ') : 'Not Tested', report.vitals.coughStatus ? report.vitals.coughStatus.toUpperCase() : 'NOT TESTED']
           ];
 
       tableRows.forEach(row => {
@@ -286,8 +288,10 @@ export const ReportsScreen: React.FC<Props> = ({ onBack }) => {
                 </tr>
                 <tr>
                   <td className="p-2.5">Estimated SpO₂ (Proxy)</td>
-                  <td className="p-2.5 font-bold">~{report.vitals.estimatedSpO2}%</td>
-                  <td className="p-2.5 text-gray-500">Prototype</td>
+                  <td className="p-2.5 font-bold">{report.vitals.estimatedSpO2 !== null && report.vitals.estimatedSpO2 !== undefined ? `~${report.vitals.estimatedSpO2}%` : 'Not Tested'}</td>
+                  <td className={`p-2.5 font-bold capitalize ${report.vitals.estimatedSpO2 !== null && report.vitals.estimatedSpO2 !== undefined ? (report.vitals.estimatedSpO2 >= 94 ? 'text-green-700' : 'text-red-700') : 'text-gray-400'}`}>
+                    {report.vitals.estimatedSpO2 !== null && report.vitals.estimatedSpO2 !== undefined ? (report.vitals.estimatedSpO2 >= 94 ? 'normal' : 'follow_up') : 'not_tested'}
+                  </td>
                 </tr>
                 <tr>
                   <td className="p-2.5">Weight / BMI</td>
