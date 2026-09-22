@@ -118,13 +118,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       <div className="w-full max-w-md space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="flex justify-center mb-1">
-            <img
-              src="/swasthsense-logo.png"
-              alt="SwasthSense Logo"
-              className="w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] object-contain mx-auto"
-            />
-          </div>
+          <img
+            src="/swasthsense-logo.png"
+            alt="SwasthSense Logo"
+            className="w-[100px] sm:w-[120px] h-auto mx-auto object-contain mb-1"
+          />
           <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center justify-center gap-2">
             SwasthSense <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-bold border border-green-200">v2.0</span>
           </h1>

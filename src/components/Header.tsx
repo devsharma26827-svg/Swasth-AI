@@ -32,7 +32,7 @@ export const Header: React.FC<Props> = ({
           <img
             src="/swasthsense-logo.png"
             alt="SwasthSense Logo"
-            className="w-10 h-10 sm:w-[44px] sm:h-[44px] object-contain shrink-0"
+            className="h-10 w-10 sm:h-11 sm:w-11 object-contain shrink-0"
           />
           <div>
             <div className="flex items-center gap-2">
