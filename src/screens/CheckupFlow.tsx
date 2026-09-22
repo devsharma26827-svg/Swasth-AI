@@ -143,7 +143,13 @@ export const CheckupFlow: React.FC<Props> = ({
     setCurrentStep('summary');
 
     try {
-      await checkupApi.create(cadence);
+      const currentRes = await checkupApi.getCurrent();
+      const currentCheckup = currentRes?.checkup;
+      if (currentCheckup?.id) {
+        await checkupApi.complete(currentCheckup.id);
+      } else {
+        await checkupApi.create(cadence);
+      }
       const riskRes = await riskApi.getSummary();
       setOverallStatus(riskRes.risk.overallStatus);
     } catch (e) {

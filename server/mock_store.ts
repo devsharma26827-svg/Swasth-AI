@@ -1231,11 +1231,13 @@ export class HealthDataStore {
     }
   }
 
-  public getPersonalizedRiskSummary(userId: string): RiskSummary {
+  public getPersonalizedRiskSummary(userId: string, targetCheckupId?: string): RiskSummary {
     const user = this.getUserById(userId);
     const profile = user?.profile;
 
-    const currentCheckup = this.getCurrentCheckup(userId);
+    const currentCheckup = targetCheckupId
+      ? user?.checkups.find(c => c.id === targetCheckupId)
+      : (this.getCurrentCheckup(userId) || (user?.checkups && user.checkups.length > 0 ? user.checkups[user.checkups.length - 1] : null));
     const readings: SignalReading[] = [];
 
     if (currentCheckup) {
@@ -1331,13 +1333,13 @@ export class HealthDataStore {
     }
 
     const userHistory = {
-      ppgCount: user.ppgHistory.length,
-      heartSoundCount: user.heartSoundHistory.length,
-      coughCount: user.coughHistory.length,
-      totalSessions: user.checkups.filter(c => c.completedAt).length
+      ppgCount: user ? user.ppgHistory.length : 0,
+      heartSoundCount: user ? user.heartSoundHistory.length : 0,
+      coughCount: user ? user.coughHistory.length : 0,
+      totalSessions: user ? user.checkups.filter(c => c.completedAt).length : 0
     };
 
-    return HealthRiskEngine.evaluateRisk(readings, user.profile, userHistory);
+    return HealthRiskEngine.evaluateRisk(readings, user ? user.profile : ({} as any), userHistory);
   }
 
   public createReport(userId: string, checkupId?: string): HealthReport {
@@ -1511,8 +1513,20 @@ export class HealthDataStore {
       });
     }
 
-    const riskSummary = this.getPersonalizedRiskSummary(userId);
+    const riskSummary = this.getPersonalizedRiskSummary(userId, checkup?.id);
     const overallStatus = riskSummary.overallStatus;
+
+    const summaryParts: string[] = [];
+    if (sessionPPG) summaryParts.push(`Cardiovascular PPG: Resting HR ${sessionPPG.heartRate} BPM (${sessionPPG.status}).`);
+    if (sessionHS) summaryParts.push(`Heart Sound auscultation: ${sessionHS.heartSoundPattern || sessionHS.patternType.replace(/_/g, ' ')} (${sessionHS.status}).`);
+    if (sessionCough) summaryParts.push(`Respiratory cough: ${sessionCough.coughPattern || sessionCough.patternType.replace(/_/g, ' ')} (${sessionCough.status}).`);
+    if (sessionGait) summaryParts.push(`Motion gait cadence: ${sessionGait.cadence} SPM (${sessionGait.status}).`);
+    if (sessionCameraGait) summaryParts.push(`Camera gait kinematics: ${sessionCameraGait.cadenceStepsPerMin} SPM (${sessionCameraGait.status}).`);
+    if (sessionBMI) summaryParts.push(`BMI evaluation: ${sessionBMI.bmi} (${sessionBMI.category}).`);
+
+    const execSummary = summaryParts.length > 0
+      ? `Screening evaluation for ${user.profile.name}: ${summaryParts.join(' ')}`
+      : (checkup?.summaryExplanation || 'Biomarker screening completed.');
 
     const report: HealthReport = {
       id: reportId,
@@ -1552,8 +1566,8 @@ export class HealthDataStore {
       createdAt: now,
       overallStatus,
       confidenceScore: riskSummary.confidence === 'high' ? 0.92 : riskSummary.confidence === 'moderate' ? 0.75 : 0.5,
-      executiveSummary: checkup?.summaryExplanation || 'Biomarker screening completed.',
-      disclaimer: 'SwasthAI is a health-tracking screening platform. It does not replace professional clinical evaluation.',
+      executiveSummary: execSummary,
+      disclaimer: 'SwasthSense is a smart health screening platform. It does not replace professional clinical evaluation.',
       vitals: {
         heartRate: sessionPPG?.heartRate || null,
         heartRateStatus: sessionPPG?.status || 'not_tested',

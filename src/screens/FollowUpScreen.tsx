@@ -57,7 +57,7 @@ export const FollowUpScreen: React.FC<Props> = ({
         {/* 1. What was detected */}
         <div className="rounded-2xl bg-[#FAF9F6] p-4 border border-gray-200 space-y-2">
           <h2 className="text-xs font-bold uppercase tracking-wider text-gray-700">
-            Observations from Recent Checks:
+            What this screening result means
           </h2>
           {riskSummary?.primarySignals && riskSummary.primarySignals.length > 0 ? (
             <div className="space-y-2">
@@ -73,7 +73,7 @@ export const FollowUpScreen: React.FC<Props> = ({
             </div>
           ) : (
             <p className="text-xs text-gray-600">
-              Resting heart rate elevation (+15% above baseline) and irregular acoustic interval signals.
+              One or more completed screening modules displayed readings differing from standard reference ranges.
             </p>
           )}
         </div>
@@ -84,6 +84,9 @@ export const FollowUpScreen: React.FC<Props> = ({
             <ShieldCheck className="h-4 w-4 text-amber-700" />
             <span>What this result does NOT mean:</span>
           </div>
+          <p className="text-[11px] font-semibold text-amber-950 mb-1">
+            Screening note: SwasthSense provides smartphone-based screening and monitoring estimates. These results are not a clinical diagnosis.
+          </p>
           <ul className="list-disc pl-4 space-y-1 text-amber-900/90 leading-relaxed">
             <li>It does <strong>NOT</strong> mean you have heart disease, arrhythmia, or infection.</li>
             <li>It is <strong>NOT</strong> a clinical diagnosis.</li>

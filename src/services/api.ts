@@ -298,7 +298,7 @@ export const reportApi = {
   getLatest: async () => {
     const list = await fetchJson<{ success: boolean; reports: HealthReport[] }>('/api/reports');
     if (list.reports && list.reports.length > 0) {
-      return { success: true, report: list.reports[0] };
+      return { success: true, report: list.reports[list.reports.length - 1] };
     }
     return fetchJson<{ success: boolean; report: HealthReport }>('/api/reports', { method: 'POST' });
   },
