@@ -164,9 +164,11 @@ export const ProfileSetupModal: React.FC<Props> = ({
         {/* Fixed Header */}
         <div className="shrink-0 border-b border-gray-100 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#E8F5E9] text-[#15803D] shrink-0">
-              <Heart className="h-5 w-5" />
-            </div>
+            <img
+              src="/swasthsense-logo.png"
+              alt="SwasthSense Logo"
+              className="w-10 h-10 object-contain shrink-0"
+            />
             <div>
               <h2 id="profile-setup-title" className="text-base font-bold text-gray-900 leading-tight">
                 Let's set up your health profile

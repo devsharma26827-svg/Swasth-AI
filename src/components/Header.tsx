@@ -29,9 +29,11 @@ export const Header: React.FC<Props> = ({
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2">
         {/* Brand & Identity */}
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#15803D] text-white shadow-xs">
-            <Activity className="h-5 w-5" />
-          </div>
+          <img
+            src="/swasthsense-logo.png"
+            alt="SwasthSense Logo"
+            className="w-10 h-10 sm:w-[44px] sm:h-[44px] object-contain shrink-0"
+          />
           <div>
             <div className="flex items-center gap-2">
               <span className="text-base font-extrabold tracking-tight text-[#1F2421]">SwasthSense</span>
