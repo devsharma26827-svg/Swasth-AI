@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, ShieldAlert, Smartphone, Monitor, ChevronDown, CheckCircle2, Shield } from 'lucide-react';
+import { ShieldAlert, Smartphone, Monitor, ChevronDown, CheckCircle2, Shield } from 'lucide-react';
 import { DemoScenario } from '../types';
 
 interface Props {

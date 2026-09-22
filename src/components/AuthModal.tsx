@@ -6,8 +6,7 @@ import {
   ArrowRight,
   AlertCircle,
   X,
-  CheckCircle2,
-  Heart
+  CheckCircle2
 } from 'lucide-react';
 import { authApi } from '../services/api';
 import { UserProfile } from '../types';
@@ -84,9 +83,11 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, onAuthSuccess }) =
         </button>
 
         <div className="flex items-center gap-2.5 border-b border-gray-100 pb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#E8F5E9] text-[#15803D]">
-            <Heart className="h-5 w-5" />
-          </div>
+          <img
+            src="/swasthsense-logo.png"
+            alt="SwasthSense Logo"
+            className="h-10 w-10 object-contain shrink-0"
+          />
           <div>
             <h2 id="auth-modal-title" className="text-base font-bold text-gray-900 leading-tight">
               {mode === 'login' ? 'Patient Account Sign In' : 'Create New Patient Account'}
