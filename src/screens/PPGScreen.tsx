@@ -89,7 +89,6 @@ export const PPGScreen: React.FC<Props> = ({
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [result, setResult] = useState<PPGMeasurementResult | null>(null);
   const [torchEnabled, setTorchEnabled] = useState(true);
-  const [videoError, setVideoError] = useState(false);
 
   // References
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -429,32 +428,14 @@ export const PPGScreen: React.FC<Props> = ({
               <span>Fingertip Camera Placement Guide</span>
             </div>
 
-            {/* Fingertip MP4 Video Asset */}
-            {!videoError ? (
-              <div className="relative mx-auto w-full max-w-[220px] overflow-hidden rounded-2xl border border-green-300 shadow-xs bg-black aspect-[4/3] flex items-center justify-center">
-                <video
-                  src="/assets/fingertip.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  preload="metadata"
-                  aria-label="Animation showing how to place your index finger over the rear camera for the PPG measurement"
-                  onError={() => setVideoError(true)}
-                  className="h-full w-full object-contain"
-                />
-              </div>
-            ) : (
-              /* Static Fallback Container */
-              <div className="mx-auto flex w-full max-w-[220px] aspect-[4/3] flex-col items-center justify-center rounded-2xl border border-green-300 bg-white p-3 shadow-2xs space-y-2">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-[#15803D]">
-                  <Camera className="h-6 w-6" />
-                </div>
-                <p className="text-[11px] font-bold text-gray-800">
-                  Place index finger over rear camera
-                </p>
-              </div>
-            )}
+            {/* Official SwasthSense Fingertip Placement Guide Image */}
+            <div className="mx-auto flex w-full max-w-[260px] md:max-w-[300px] items-center justify-center overflow-hidden py-1">
+              <img
+                src="/assets/ppg-fingertip-guide.png"
+                alt="Illustration showing an index finger placed over the rear smartphone camera for the PPG measurement."
+                className="h-auto w-full max-h-[260px] object-contain drop-shadow-xs transition-all"
+              />
+            </div>
 
             <div className="space-y-1 text-center">
               <p className="text-xs font-bold text-gray-900">
