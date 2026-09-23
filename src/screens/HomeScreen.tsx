@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Activity,
   Heart,
@@ -36,6 +36,10 @@ export const HomeScreen: React.FC<Props> = ({
   onOpenLabBooking,
   onOpenFollowUp
 }) => {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -149,7 +153,7 @@ export const HomeScreen: React.FC<Props> = ({
         </div>
 
         {/* Today's Check-in Card */}
-        <div className="mt-4 rounded-2xl bg-[#FAF9F6] p-4 border border-[#E8E4D9]">
+        <div className="mt-4 rounded-2xl bg-[#FAF9F6] p-4 border border-[#E8E4D9] swasth-soft-glow">
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
@@ -165,7 +169,7 @@ export const HomeScreen: React.FC<Props> = ({
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={onStartCheckup}
-              className="flex-1 rounded-xl bg-[#15803D] py-3 text-xs font-bold text-white shadow hover:bg-[#166534] transition-all flex items-center justify-center gap-1.5"
+              className="flex-1 rounded-xl bg-[#15803D] py-3 text-xs font-bold text-white shadow hover:bg-[#166534] transition-all flex items-center justify-center gap-1.5 swasth-shimmer"
             >
               <Activity className="h-4 w-4" />
               <span>Start New Checkup</span>

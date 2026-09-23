@@ -31,6 +31,10 @@ export default function App() {
     bootstrapApp();
   }, []);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [currentTab, activeSubView]);
+
   const bootstrapApp = async () => {
     setIsLoading(true);
     try {

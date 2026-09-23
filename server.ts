@@ -767,7 +767,7 @@ immediately contact emergency medical services.
 `;
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="SwasthAI_Report_${report.reportNumber}.txt"`);
+  res.setHeader('Content-Disposition', `attachment; filename="SwasthSense_Health_Report_${report.reportNumber}.txt"`);
   return res.send(reportText);
 });
 

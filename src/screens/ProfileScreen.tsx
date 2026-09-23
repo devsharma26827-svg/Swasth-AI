@@ -38,7 +38,9 @@ export const ProfileScreen: React.FC<Props> = ({
 }) => {
   const [name, setName] = useState(profile.name);
   const [age, setAge] = useState(profile.age);
-  const [height, setHeight] = useState(profile.height);
+  const [heightInches, setHeightInches] = useState<number>(
+    profile.height ? Math.round((profile.height / 2.54) * 10) / 10 : 67
+  );
   const [weight, setWeight] = useState(profile.weight);
   const [conditions, setConditions] = useState(profile.existingConditions.join(', '));
   const [medications, setMedications] = useState(profile.medications || '');
@@ -56,11 +58,21 @@ export const ProfileScreen: React.FC<Props> = ({
     e.preventDefault();
     setIsSaving(true);
     setStatusMessage(null);
+
+    const parsedInches = Number(heightInches);
+    if (isNaN(parsedInches) || parsedInches < 24 || parsedInches > 96) {
+      setStatusMessage({ type: 'error', text: 'Please enter a valid height between 24 and 96 inches.' });
+      setIsSaving(false);
+      return;
+    }
+
+    const heightCm = Math.round(parsedInches * 2.54 * 10) / 10;
+
     try {
       const res = await profileApi.update({
         name,
         age: Number(age),
-        height: Number(height),
+        height: heightCm,
         weight: Number(weight),
         existingConditions: conditions ? conditions.split(',').map(s => s.trim()) : [],
         medications
@@ -180,11 +192,12 @@ export const ProfileScreen: React.FC<Props> = ({
               />
             </div>
             <div>
-              <label className="font-semibold text-gray-700">Height (cm)</label>
+              <label className="font-semibold text-gray-700">Height (inches)</label>
               <input
                 type="number"
-                value={height}
-                onChange={e => setHeight(Number(e.target.value))}
+                step="0.1"
+                value={heightInches}
+                onChange={e => setHeightInches(Number(e.target.value))}
                 className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 font-medium text-gray-900 focus:border-[#15803D] focus:outline-hidden"
               />
             </div>

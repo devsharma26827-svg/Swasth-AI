@@ -1353,7 +1353,7 @@ export class HealthDataStore {
     const sessionHS = checkup?.modules?.heartSound?.status === 'completed' ? checkup.modules.heartSound.result : null;
     const sessionCough = checkup?.modules?.cough?.status === 'completed' ? checkup.modules.cough.result : null;
     const sessionGait = checkup?.modules?.gait?.status === 'completed' ? checkup.modules.gait.result : (checkup?.modules?.gaitMotion?.status === 'completed' ? checkup.modules.gaitMotion.result : null);
-    const sessionCameraGait = checkup?.modules?.gaitCamera?.status === 'completed' ? checkup.modules.gaitCamera.result : null;
+    const sessionCameraGait = (checkup?.modules?.gaitCamera?.status === 'completed' && checkup.modules.gaitCamera.result && checkup.modules.gaitCamera.result.status !== 'insufficient') ? checkup.modules.gaitCamera.result : null;
     const sessionBMI = checkup?.modules?.bmi?.status === 'completed' ? checkup.modules.bmi.result : null;
 
     const reportId = `rep_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -1485,7 +1485,7 @@ export class HealthDataStore {
         name: 'Camera Vision Gait Kinematics',
         tested: false,
         status: 'not_tested',
-        valueDisplay: 'Not Screened'
+        valueDisplay: 'Not Tested'
       });
     }
 

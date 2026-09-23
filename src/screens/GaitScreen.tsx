@@ -87,45 +87,9 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
   }, [gaitModality]);
 
   const initCameraPreview = async () => {
-    if (!isMountedRef.current) return;
-    stopCameraStream();
-
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          },
-          audio: false
-        });
-
-        if (!isMountedRef.current) {
-          stream.getTracks().forEach(t => {
-            try { t.stop(); } catch (_) {}
-          });
-          return;
-        }
-
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-        if (isMountedRef.current) {
-          setCameraPermissionGranted(true);
-        }
-      } else {
-        if (isMountedRef.current) {
-          setCameraPermissionGranted(false);
-        }
-      }
-    } catch (e) {
-      console.warn('Camera preview not accessible:', e);
-      if (isMountedRef.current) {
-        setCameraPermissionGranted(false);
-      }
+    // Camera Vision Gait is Coming Soon - do not request camera permissions or initialize preview
+    if (isMountedRef.current) {
+      setCameraPermissionGranted(null);
     }
   };
 
@@ -688,199 +652,34 @@ export const GaitScreen: React.FC<Props> = ({ onComplete, onBack, currentScenari
       {/* 1. CAMERA VISION GAIT PANEL */}
       {/* ========================================================================= */}
       {gaitModality === 'camera' && (
-        <div className="rounded-3xl border border-[#EAE7DE] bg-white p-5 shadow-xs space-y-4">
+        <div className="rounded-3xl border border-[#EAE7DE] bg-white p-6 shadow-xs space-y-5 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 border border-amber-200">
+            <Footprints className="h-7 w-7" />
+          </div>
+
           <div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-md bg-teal-100 px-2 py-0.5 text-[10px] font-bold text-teal-800">
-                MediaPipe 3D Kinematics
-              </span>
-              <span className="text-xs text-gray-500 font-medium">Fixed Camera Walk-Toward</span>
-            </div>
-            <h2 className="text-lg font-bold text-[#1F2421] mt-1">Computer Vision Gait Analysis</h2>
-            <p className="text-xs text-[#5C645D]">
-              Prop the phone upright at waist level. Step back 3–4 meters and walk straight towards the camera.
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-800">
+              COMING SOON
+            </span>
+            <h2 className="text-xl font-bold text-[#1F2421] mt-3">Camera Vision Gait</h2>
+            <p className="text-xs text-[#5C645D] leading-relaxed max-w-xs mx-auto mt-2">
+              Camera-based gait screening is currently being refined.
+            </p>
+            <p className="text-xs text-gray-500 font-medium mt-1">
+              Continue with the remaining health assessment.
             </p>
           </div>
 
-          {/* Setup Guidelines */}
-          <div className="rounded-2xl bg-[#F8F7F2] p-3.5 text-xs text-gray-700 space-y-1.5 border border-gray-200">
-            <div className="font-bold text-gray-900 flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-[#15803D]" />
-              <span>Camera Setup Instructions:</span>
-            </div>
-            <div>• Place phone on a steady table or chair facing a clear 3–4 meter walking space.</div>
-            <div>• Step back until your full body (head to feet) is visible in the frame.</div>
-            <div>• When the 5-second countdown finishes, walk straight towards the phone.</div>
-          </div>
-
-          {/* Video Preview & Canvas Overlay */}
-          <div className="relative overflow-hidden rounded-2xl bg-neutral-900 aspect-4/3 flex items-center justify-center">
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              autoPlay
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            <canvas
-              ref={canvasRef}
-              className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-            />
-
-            {/* Guide Silhouette Overlay */}
-            {processingState === 'idle' && (
-              <div className="absolute inset-0 border-2 border-dashed border-white/40 m-4 rounded-xl flex flex-col items-center justify-center bg-black/20 pointer-events-none">
-                <div className="h-28 w-16 border-2 border-white/60 rounded-full mb-2 opacity-50 flex items-center justify-center">
-                  <span className="text-[10px] text-white/80 font-bold">Body Center</span>
-                </div>
-                <span className="text-xs font-semibold text-white bg-black/60 px-3 py-1 rounded-full">
-                  Align full body inside corridor
-                </span>
-              </div>
-            )}
-
-            {/* Countdown Overlay */}
-            {processingState === 'countdown' && (
-              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white space-y-2 z-10">
-                <span className="text-xs uppercase tracking-widest text-amber-300 font-bold">Get In Position</span>
-                <span className="text-6xl font-black text-white animate-pulse">{countdownSeconds}</span>
-                <p className="text-xs text-gray-200">Step back 3–4 meters away from camera</p>
-              </div>
-            )}
-
-            {/* Recording HUD */}
-            {processingState === 'recording' && (
-              <div className="absolute inset-x-0 top-0 p-3 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between text-white z-10">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-3 w-3 rounded-full bg-red-500 animate-ping" />
-                  <span className="text-xs font-bold tracking-wider uppercase text-red-300">Walking • {cameraSecondsLeft}s left</span>
-                </div>
-                <div className="text-[11px] font-mono bg-black/60 px-2.5 py-1 rounded-lg border border-white/20">
-                  {framesCollected} frames analyzed
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Action Button */}
-          {processingState === 'idle' && (
+          <div className="pt-2">
             <button
-              onClick={startCameraGaitTest}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#15803D] py-3.5 px-6 text-sm font-bold text-white shadow hover:bg-[#166534] transition-all"
+              onClick={() => {
+                if (onComplete) onComplete(undefined as any);
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#15803D] py-4 px-6 text-sm font-bold text-white shadow-sm hover:bg-[#166534] transition-all"
             >
-              <Camera className="h-4 w-4" />
-              <span>Start Camera Gait Assessment</span>
+              <span>Continue to Weight & BMI</span>
             </button>
-          )}
-
-          {processingState === 'processing' && (
-            <div className="flex items-center justify-center gap-3 rounded-2xl bg-amber-50 p-4 border border-amber-200 text-amber-950 text-xs font-semibold">
-              <RefreshCw className="h-4 w-4 animate-spin text-amber-700" />
-              <span>Calculating bilateral symmetry index, step cadence, and knee flexion...</span>
-            </div>
-          )}
-
-          {processingState === 'error' && (
-            <div className="space-y-3">
-              <div className="rounded-2xl bg-red-50 p-4 border border-red-200 text-xs text-red-900 flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-bold">Gait Recording Interrupted</h4>
-                  <p className="mt-0.5 text-red-800">{errorMessage}</p>
-                </div>
-              </div>
-              <button
-                onClick={handleResetCamera}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#15803D] py-3 text-xs font-bold text-white shadow hover:bg-[#166534]"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span>Retry Camera Test</span>
-              </button>
-            </div>
-          )}
-
-          {/* Results Display */}
-          {cameraResult && processingState === 'success' && (
-            <div className="space-y-3 rounded-2xl bg-[#F8F7F2] p-4 border border-[#EAE7DE] animate-fade-in">
-              <div className="flex items-center justify-between border-b border-gray-200 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-[#15803D]" />
-                  <span className="text-sm font-bold text-gray-900">Computer Vision Gait Report</span>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                    cameraResult.status === 'normal'
-                      ? 'bg-green-100 text-green-800'
-                      : cameraResult.status === 'monitor'
-                      ? 'bg-amber-100 text-amber-800'
-                      : cameraResult.status === 'insufficient'
-                      ? 'bg-gray-200 text-gray-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {cameraResult.status === 'normal'
-                    ? 'Balanced Gait'
-                    : cameraResult.status === 'monitor'
-                    ? 'Monitor Asymmetry'
-                    : cameraResult.status === 'insufficient'
-                    ? 'Low Signal Quality'
-                    : 'Gait Irregularity'}
-                </span>
-              </div>
-
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="rounded-xl bg-white p-3 border border-gray-200">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase">Cadence</span>
-                  <div className="text-lg font-black text-gray-900 mt-0.5">
-                    {cameraResult.cadenceStepsPerMin} <span className="text-xs font-medium text-gray-500">spm</span>
-                  </div>
-                  <span className="text-[10px] text-gray-500">Reference: 90–120 spm</span>
-                </div>
-
-                <div className="rounded-xl bg-white p-3 border border-gray-200">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase">Step Symmetry</span>
-                  <div className="text-lg font-black text-gray-900 mt-0.5">
-                    {cameraResult.stepSymmetryIndex}%
-                  </div>
-                  <span className="text-[10px] text-gray-500">Target: &gt;85% bilateral</span>
-                </div>
-
-                <div className="rounded-xl bg-white p-3 border border-gray-200">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase">Walking Speed</span>
-                  <div className="text-lg font-black text-gray-900 mt-0.5">
-                    {cameraResult.speedMps ?? (Number((cameraResult.cadenceStepsPerMin * 0.012).toFixed(2)) || 1.15)} <span className="text-xs font-medium text-gray-500">m/s</span>
-                  </div>
-                  <span className="text-[10px] text-gray-500">Ref: 1.0–1.4 m/s</span>
-                </div>
-
-                <div className="rounded-xl bg-white p-3 border border-gray-200">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase">Pelvic Drop</span>
-                  <div className="text-lg font-black text-gray-900 mt-0.5">
-                    {cameraResult.pelvicDropAsymmetry ?? 3.2}°
-                  </div>
-                  <span className="text-[10px] text-gray-500">Coronal tilt &lt;5°</span>
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-white p-3 border border-gray-200 text-xs text-gray-700">
-                <span className="font-bold text-gray-900">Clinical Kinematic Insight:</span>
-                <p className="mt-1">{cameraResult.explanation}</p>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
-                <span>Model: {cameraResult.modelVersion}</span>
-                <span>Pose Confidence: {cameraResult.confidence} ({cameraResult.signalQuality}% quality)</span>
-              </div>
-
-              <button
-                onClick={handleResetCamera}
-                className="w-full rounded-xl bg-gray-200 py-2.5 text-xs font-bold text-gray-800 hover:bg-gray-300"
-              >
-                Perform Another Walk
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       )}
 

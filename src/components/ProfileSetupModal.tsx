@@ -35,7 +35,9 @@ export const ProfileSetupModal: React.FC<Props> = ({
   const [sex, setSex] = useState<'male' | 'female' | 'other' | 'prefer_not_to_say'>(
     initialProfile?.sex || 'prefer_not_to_say'
   );
-  const [height, setHeight] = useState<string>(initialProfile?.height ? String(initialProfile.height) : '');
+  const [heightInches, setHeightInches] = useState<string>(
+    initialProfile?.height ? String(Math.round((initialProfile.height / 2.54) * 10) / 10) : ''
+  );
   const [weight, setWeight] = useState<string>(initialProfile?.weight ? String(initialProfile.weight) : '');
 
   // Optional info
@@ -72,9 +74,9 @@ export const ProfileSetupModal: React.FC<Props> = ({
 
   const validateStep2 = (): boolean => {
     const errs: Record<string, string> = {};
-    const parsedHeight = Number(height);
-    if (!height || isNaN(parsedHeight) || parsedHeight < 50 || parsedHeight > 250) {
-      errs.height = 'Please enter height in cm between 50 and 250.';
+    const parsedHeight = Number(heightInches);
+    if (!heightInches || isNaN(parsedHeight) || parsedHeight < 24 || parsedHeight > 96) {
+      errs.height = 'Please enter height in inches between 24 and 96.';
     }
     const parsedWeight = Number(weight);
     if (!weight || isNaN(parsedWeight) || parsedWeight < 20 || parsedWeight > 300) {
@@ -128,7 +130,7 @@ export const ProfileSetupModal: React.FC<Props> = ({
         name: name.trim(),
         age: Number(age),
         sex,
-        height: Number(height),
+        height: Math.round(Number(heightInches) * 2.54 * 10) / 10,
         weight: Number(weight),
         existingConditions: conditions
           ? conditions.split(',').map(s => s.trim()).filter(Boolean)
@@ -304,18 +306,19 @@ export const ProfileSetupModal: React.FC<Props> = ({
             <div className="flex-1 overflow-y-auto py-3 pr-1 space-y-3.5">
               <div>
                 <label htmlFor="setup-height" className="block text-xs font-bold text-gray-700">
-                  Height (cm) <span className="text-red-500">*</span>
+                  Height (inches) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative mt-1">
                   <Ruler className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                   <input
                     id="setup-height"
                     type="number"
-                    min="50"
-                    max="250"
-                    value={height}
-                    onChange={e => setHeight(e.target.value)}
-                    placeholder="e.g. 172"
+                    min="24"
+                    max="96"
+                    step="0.1"
+                    value={heightInches}
+                    onChange={e => setHeightInches(e.target.value)}
+                    placeholder="e.g. 68"
                     className={`w-full rounded-xl border py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-hidden focus:ring-2 ${
                       errors.height
                         ? 'border-red-400 focus:ring-red-200'
@@ -356,11 +359,11 @@ export const ProfileSetupModal: React.FC<Props> = ({
               </div>
 
               {/* BMI Preview Callout */}
-              {Number(height) > 0 && Number(weight) > 0 && (
+              {Number(heightInches) > 0 && Number(weight) > 0 && (
                 <div className="rounded-xl bg-[#F8F7F2] p-3 text-xs border border-gray-200 flex items-center justify-between">
                   <span className="text-gray-600">Calculated Baseline BMI:</span>
                   <span className="font-bold text-gray-900">
-                    {(Number(weight) / Math.pow(Number(height) / 100, 2)).toFixed(1)} kg/m²
+                    {(Number(weight) / Math.pow((Number(heightInches) * 2.54) / 100, 2)).toFixed(1)} kg/m²
                   </span>
                 </div>
               )}

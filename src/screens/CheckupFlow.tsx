@@ -76,7 +76,7 @@ export const CheckupFlow: React.FC<Props> = ({
   };
 
   const [currentStep, setCurrentStep] = useState<CheckupStep>('overview');
-  const [cadence, setCadence] = useState<'daily' | 'weekly' | 'comprehensive'>('daily');
+  const [cadence, setCadence] = useState<'daily' | 'weekly' | 'comprehensive'>('comprehensive');
   const [completedModules, setCompletedModules] = useState<{
     ppg?: PPGMeasurementResult;
     heartSound?: HeartSoundResult;
@@ -87,7 +87,12 @@ export const CheckupFlow: React.FC<Props> = ({
   const [overallStatus, setOverallStatus] = useState<HealthStatus>('normal');
   const [isFinalizing, setIsFinalizing] = useState(false);
 
-  const startModule = (step: CheckupStep) => {
+  const startModule = async (step: CheckupStep) => {
+    try {
+      await checkupApi.create(cadence);
+    } catch (e) {
+      console.warn('Checkup session created locally / existing used', e);
+    }
     setCurrentStep(step);
   };
 
@@ -210,11 +215,14 @@ export const CheckupFlow: React.FC<Props> = ({
                   onClick={() => setCadence('comprehensive')}
                   className={`p-3 rounded-2xl border transition-all ${
                     cadence === 'comprehensive'
-                      ? 'border-[#15803D] bg-[#E8F5E9] text-[#166534] font-bold shadow-2xs'
+                      ? 'border-[#15803D] bg-[#E8F5E9] text-[#166534] font-bold shadow-2xs swasth-shimmer'
                       : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  <div>Comprehensive</div>
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Comprehensive</span>
+                    <span className="rounded-md bg-[#15803D] text-white px-1 py-0.2 text-[8px] font-black uppercase">Rec</span>
+                  </div>
                   <div className="text-[10px] text-gray-600 mt-0.5">7 min • All 5 Modules</div>
                 </button>
               </div>
@@ -413,7 +421,7 @@ export const CheckupFlow: React.FC<Props> = ({
                 <div className="flex gap-2">
                   <button
                     onClick={onNavigateToReports}
-                    className="flex-1 rounded-2xl border border-gray-300 bg-white py-3 text-xs font-bold text-gray-700 hover:bg-gray-50 shadow-2xs flex items-center justify-center gap-1.5"
+                    className="flex-1 rounded-2xl border border-gray-300 bg-white py-3 text-xs font-bold text-gray-700 hover:bg-gray-50 shadow-2xs flex items-center justify-center gap-1.5 swasth-shimmer"
                   >
                     <FileText className="h-4 w-4 text-gray-500" />
                     <span>Download Report (PDF)</span>

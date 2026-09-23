@@ -320,7 +320,7 @@ export const reportApi = {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `SwasthAI_Report_${reportNumber || id}.txt`;
+    a.download = `SwasthSense_Health_Report_${reportNumber || id}.txt`;
     document.body.appendChild(a);
     a.click();
     a.remove();
