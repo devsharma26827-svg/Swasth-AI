@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Activity,
   Heart,
@@ -36,8 +36,12 @@ export const HomeScreen: React.FC<Props> = ({
   onOpenLabBooking,
   onOpenFollowUp
 }) => {
+  const [showShimmer, setShowShimmer] = useState(true);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
   }, []);
 
   const getGreeting = () => {
@@ -168,8 +172,13 @@ export const HomeScreen: React.FC<Props> = ({
 
           <div className="mt-3 flex items-center gap-2">
             <button
-              onClick={onStartCheckup}
-              className="flex-1 rounded-xl bg-[#15803D] py-3 text-xs font-bold text-white shadow hover:bg-[#166534] transition-all flex items-center justify-center gap-1.5 swasth-shimmer"
+              onClick={() => {
+                setShowShimmer(false);
+                onStartCheckup();
+              }}
+              className={`flex-1 rounded-xl bg-[#15803D] py-3 text-xs font-bold text-white shadow hover:bg-[#166534] transition-all flex items-center justify-center gap-1.5 ${
+                showShimmer ? 'swasth-shimmer' : ''
+              }`}
             >
               <Activity className="h-4 w-4" />
               <span>Start New Checkup</span>

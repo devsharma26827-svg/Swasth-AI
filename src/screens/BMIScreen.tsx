@@ -11,21 +11,19 @@ interface Props {
 
 export const BMIScreen: React.FC<Props> = ({ profile, onComplete, onBack }) => {
   const safeProfile = profile || { height: 170, weight: 70 };
-  const [heightInches, setHeightInches] = useState<number>(
-    safeProfile.height ? Math.round((safeProfile.height / 2.54) * 10) / 10 : 67
-  );
+  const [heightCm, setHeightCm] = useState(safeProfile.height || 170);
   const [weightKg, setWeightKg] = useState(safeProfile.weight || 70);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<BMIResult | null>(null);
+  const [shimmerActive, setShimmerActive] = useState(true);
 
   const calculateAndSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setShimmerActive(false);
     setIsSubmitting(true);
-    const heightCm = Math.round(Number(heightInches) * 2.54 * 10) / 10;
-
     try {
       const res = await measurementApi.submitBMI({
-        heightCm,
+        heightCm: Number(heightCm),
         weightKg: Number(weightKg)
       });
       setResult(res.bmi);
@@ -68,12 +66,11 @@ export const BMIScreen: React.FC<Props> = ({ profile, onComplete, onBack }) => {
         <form onSubmit={calculateAndSave} className="mt-4 space-y-3 text-xs">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold text-gray-700">Height (inches)</label>
+              <label className="font-semibold text-gray-700">Height (cm)</label>
               <input
                 type="number"
-                step="0.1"
-                value={heightInches}
-                onChange={e => setHeightInches(Number(e.target.value))}
+                value={heightCm}
+                onChange={e => setHeightCm(Number(e.target.value))}
                 className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 font-medium text-gray-900 focus:border-[#15803D] focus:outline-hidden"
                 required
               />
@@ -94,7 +91,9 @@ export const BMIScreen: React.FC<Props> = ({ profile, onComplete, onBack }) => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#15803D] py-3.5 px-6 text-sm font-bold text-white shadow hover:bg-[#166534] transition-all disabled:opacity-50 swasth-shimmer"
+            className={`flex w-full items-center justify-center gap-2 rounded-2xl bg-[#15803D] py-3.5 px-6 text-sm font-bold text-white shadow hover:bg-[#166534] transition-all disabled:opacity-50 ${
+              shimmerActive ? 'swasth-shimmer' : ''
+            }`}
           >
             <Scale className="h-4 w-4" />
             <span>{isSubmitting ? 'Updating...' : 'Calculate & Record Weight'}</span>

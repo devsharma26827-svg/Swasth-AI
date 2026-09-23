@@ -24,7 +24,7 @@ export const OnboardingFlow: React.FC<Props> = ({ onComplete }) => {
     name: '',
     age: 28,
     sex: 'male' as const,
-    heightInches: 67,
+    height: 170,
     weight: 68,
     conditions: '',
     medications: '',
@@ -90,14 +90,12 @@ export const OnboardingFlow: React.FC<Props> = ({ onComplete }) => {
 
   const handleFinishOnboarding = async () => {
     setIsSaving(true);
-    const heightCm = Math.round(Number(formData.heightInches) * 2.54 * 10) / 10;
-
     try {
       const updated = await profileApi.update({
         name: formData.name,
         age: Number(formData.age),
         sex: formData.sex,
-        height: heightCm,
+        height: Number(formData.height),
         weight: Number(formData.weight),
         existingConditions: formData.conditions ? formData.conditions.split(',').map(s => s.trim()) : [],
         medications: formData.medications,
@@ -113,7 +111,7 @@ export const OnboardingFlow: React.FC<Props> = ({ onComplete }) => {
         email: 'devsharma26827@gmail.com',
         age: Number(formData.age),
         sex: formData.sex,
-        height: heightCm,
+        height: Number(formData.height),
         weight: Number(formData.weight),
         existingConditions: [formData.conditions],
         createdAt: new Date().toISOString(),
@@ -228,12 +226,11 @@ export const OnboardingFlow: React.FC<Props> = ({ onComplete }) => {
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="font-semibold text-gray-700">Height (inches)</label>
+                  <label className="font-semibold text-gray-700">Height (cm)</label>
                   <input
                     type="number"
-                    step="0.1"
-                    value={formData.heightInches}
-                    onChange={e => setFormData({ ...formData, heightInches: Number(e.target.value) })}
+                    value={formData.height}
+                    onChange={e => setFormData({ ...formData, height: Number(e.target.value) })}
                     className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 font-medium text-gray-900 focus:border-[#15803D] focus:outline-hidden"
                   />
                 </div>

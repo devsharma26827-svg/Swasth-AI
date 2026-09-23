@@ -23,15 +23,19 @@ export const CoughScreen: React.FC<Props> = ({ onComplete, onBack, currentScenar
   const sensorRef = useRef<MicrophoneAudioSensor | null>(null);
   const audioSamplesRef = useRef<number[]>([]);
   const timerRef = useRef<any>(null);
+  const [shimmerActive, setShimmerActive] = useState(true);
 
   useEffect(() => {
     sensorRef.current = new MicrophoneAudioSensor();
+    const shimmerTimer = setTimeout(() => setShimmerActive(false), 6000);
     return () => {
+      clearTimeout(shimmerTimer);
       stopRecording();
     };
   }, []);
 
   const startRecording = async () => {
+    setShimmerActive(false);
     setErrorMessage('');
     setResult(null);
     audioSamplesRef.current = [];
@@ -160,7 +164,9 @@ export const CoughScreen: React.FC<Props> = ({ onComplete, onBack, currentScenar
         </div>
 
         {/* Instructions */}
-        <div className="mt-4 rounded-2xl bg-[#F8F7F2] p-4 text-xs text-gray-700 space-y-1.5 border border-gray-200 swasth-shimmer">
+        <div className={`mt-4 rounded-2xl bg-[#F8F7F2] p-4 text-xs text-gray-700 space-y-1.5 border border-gray-200 ${
+          shimmerActive ? 'swasth-shimmer' : ''
+        }`}>
           <div className="font-bold text-gray-900">Protocol Instructions:</div>
           <div>• Hold the smartphone approximately 15-20 cm (6-8 inches) away from your mouth.</div>
           <div>• Cough 2 to 3 times distinctly after pressing start.</div>

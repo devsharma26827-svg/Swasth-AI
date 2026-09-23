@@ -77,6 +77,8 @@ export const CheckupFlow: React.FC<Props> = ({
 
   const [currentStep, setCurrentStep] = useState<CheckupStep>('overview');
   const [cadence, setCadence] = useState<'daily' | 'weekly' | 'comprehensive'>('comprehensive');
+  const [shimmerComprehensive, setShimmerComprehensive] = useState(true);
+  const [shimmerReport, setShimmerReport] = useState(true);
   const [completedModules, setCompletedModules] = useState<{
     ppg?: PPGMeasurementResult;
     heartSound?: HeartSoundResult;
@@ -88,6 +90,7 @@ export const CheckupFlow: React.FC<Props> = ({
   const [isFinalizing, setIsFinalizing] = useState(false);
 
   const startModule = async (step: CheckupStep) => {
+    setShimmerComprehensive(false);
     try {
       await checkupApi.create(cadence);
     } catch (e) {
@@ -212,10 +215,13 @@ export const CheckupFlow: React.FC<Props> = ({
 
                 <button
                   type="button"
-                  onClick={() => setCadence('comprehensive')}
+                  onClick={() => {
+                    setCadence('comprehensive');
+                    setShimmerComprehensive(false);
+                  }}
                   className={`p-3 rounded-2xl border transition-all ${
                     cadence === 'comprehensive'
-                      ? 'border-[#15803D] bg-[#E8F5E9] text-[#166534] font-bold shadow-2xs swasth-shimmer'
+                      ? `border-[#15803D] bg-[#E8F5E9] text-[#166534] font-bold shadow-2xs ${shimmerComprehensive ? 'swasth-shimmer' : ''}`
                       : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -420,8 +426,13 @@ export const CheckupFlow: React.FC<Props> = ({
 
                 <div className="flex gap-2">
                   <button
-                    onClick={onNavigateToReports}
-                    className="flex-1 rounded-2xl border border-gray-300 bg-white py-3 text-xs font-bold text-gray-700 hover:bg-gray-50 shadow-2xs flex items-center justify-center gap-1.5 swasth-shimmer"
+                    onClick={() => {
+                      setShimmerReport(false);
+                      onNavigateToReports();
+                    }}
+                    className={`flex-1 rounded-2xl border border-gray-300 bg-white py-3 text-xs font-bold text-gray-700 hover:bg-gray-50 shadow-2xs flex items-center justify-center gap-1.5 ${
+                      shimmerReport ? 'swasth-shimmer' : ''
+                    }`}
                   >
                     <FileText className="h-4 w-4 text-gray-500" />
                     <span>Download Report (PDF)</span>

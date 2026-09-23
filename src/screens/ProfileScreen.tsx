@@ -38,9 +38,7 @@ export const ProfileScreen: React.FC<Props> = ({
 }) => {
   const [name, setName] = useState(profile.name);
   const [age, setAge] = useState(profile.age);
-  const [heightInches, setHeightInches] = useState<number>(
-    profile.height ? Math.round((profile.height / 2.54) * 10) / 10 : 67
-  );
+  const [height, setHeight] = useState<number>(profile.height || 170);
   const [weight, setWeight] = useState(profile.weight);
   const [conditions, setConditions] = useState(profile.existingConditions.join(', '));
   const [medications, setMedications] = useState(profile.medications || '');
@@ -59,20 +57,18 @@ export const ProfileScreen: React.FC<Props> = ({
     setIsSaving(true);
     setStatusMessage(null);
 
-    const parsedInches = Number(heightInches);
-    if (isNaN(parsedInches) || parsedInches < 24 || parsedInches > 96) {
-      setStatusMessage({ type: 'error', text: 'Please enter a valid height between 24 and 96 inches.' });
+    const parsedHeight = Number(height);
+    if (isNaN(parsedHeight) || parsedHeight < 50 || parsedHeight > 250) {
+      setStatusMessage({ type: 'error', text: 'Please enter height in cm between 50 and 250.' });
       setIsSaving(false);
       return;
     }
-
-    const heightCm = Math.round(parsedInches * 2.54 * 10) / 10;
 
     try {
       const res = await profileApi.update({
         name,
         age: Number(age),
-        height: heightCm,
+        height: parsedHeight,
         weight: Number(weight),
         existingConditions: conditions ? conditions.split(',').map(s => s.trim()) : [],
         medications
@@ -192,12 +188,11 @@ export const ProfileScreen: React.FC<Props> = ({
               />
             </div>
             <div>
-              <label className="font-semibold text-gray-700">Height (inches)</label>
+              <label className="font-semibold text-gray-700">Height (cm)</label>
               <input
                 type="number"
-                step="0.1"
-                value={heightInches}
-                onChange={e => setHeightInches(Number(e.target.value))}
+                value={height}
+                onChange={e => setHeight(Number(e.target.value))}
                 className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 font-medium text-gray-900 focus:border-[#15803D] focus:outline-hidden"
               />
             </div>

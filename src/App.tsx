@@ -99,10 +99,27 @@ export default function App() {
     }
   };
 
+  const resetScrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    const mainEl = document.querySelector('main');
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+  };
+
+  useEffect(() => {
+    if (!showProfileSetup) {
+      resetScrollToTop();
+    }
+  }, [showProfileSetup]);
+
   const handleProfileSetupComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
     setShowProfileSetup(false);
     localStorage.setItem('swasth_onboarded', 'true');
+    resetScrollToTop();
   };
 
   const handleAuthSuccess = async (authUser: UserProfile) => {
