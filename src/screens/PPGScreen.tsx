@@ -89,6 +89,7 @@ export const PPGScreen: React.FC<Props> = ({
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [result, setResult] = useState<PPGMeasurementResult | null>(null);
   const [torchEnabled, setTorchEnabled] = useState(true);
+  const [videoError, setVideoError] = useState(false);
 
   // References
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -419,6 +420,52 @@ export const PPGScreen: React.FC<Props> = ({
             Detects micro-pulsatile capillary blood expansion via rear camera optical absorption.
           </p>
         </div>
+
+        {/* Fingertip Camera Placement Instruction Guide (Idle State) */}
+        {sensorPhase === 'idle' && (
+          <div className="rounded-2xl border border-green-200 bg-[#F4F9F4] p-4 text-center space-y-3 animate-fade-in">
+            <div className="text-xs font-bold text-[#166534] flex items-center justify-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-[#15803D]" />
+              <span>Fingertip Camera Placement Guide</span>
+            </div>
+
+            {/* Fingertip MP4 Video Asset */}
+            {!videoError ? (
+              <div className="relative mx-auto w-full max-w-[220px] overflow-hidden rounded-2xl border border-green-300 shadow-xs bg-black aspect-[4/3] flex items-center justify-center">
+                <video
+                  src="/assets/fingertip.mp4"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  aria-label="Animation showing how to place your index finger over the rear camera for the PPG measurement"
+                  onError={() => setVideoError(true)}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+            ) : (
+              /* Static Fallback Container */
+              <div className="mx-auto flex w-full max-w-[220px] aspect-[4/3] flex-col items-center justify-center rounded-2xl border border-green-300 bg-white p-3 shadow-2xs space-y-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-[#15803D]">
+                  <Camera className="h-6 w-6" />
+                </div>
+                <p className="text-[11px] font-bold text-gray-800">
+                  Place index finger over rear camera
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1 text-center">
+              <p className="text-xs font-bold text-gray-900">
+                Place your index finger gently over the rear camera lens.
+              </p>
+              <p className="text-[11px] text-gray-600 leading-relaxed">
+                Cover the camera lens completely and keep your finger steady during measurement.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Live Camera Viewport & Placement Guidance */}
         {activeMode === 'real' && (
